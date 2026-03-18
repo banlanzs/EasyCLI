@@ -42,8 +42,8 @@ function renderOpenaiProviders() {
         list.innerHTML = `
             <div class="empty-state">
                 <div class="empty-state-icon">🤖</div>
-                <div class="empty-state-text">No OpenAI Compatibility Providers</div>
-                <div class="empty-state-subtitle">Add your first provider to get started</div>
+                <div class="empty-state-text">${i18n.t('settings.openai.empty')}</div>
+                <div class="empty-state-subtitle">${i18n.t('settings.openai.empty.sub')}</div>
             </div>
         `;
         return;
@@ -70,8 +70,8 @@ function renderOpenaiProviders() {
             </div>
         </div>
             <div class="openai-provider-actions">
-                <button class="openai-provider-btn edit" onclick="editOpenaiProvider(${index})">Edit</button>
-                <button class="openai-provider-btn delete" onclick="deleteOpenaiProvider(${index})">Delete</button>
+                <button class="openai-provider-btn edit" onclick="editOpenaiProvider(${index})">${i18n.t('settings.btn.edit')}</button>
+                <button class="openai-provider-btn delete" onclick="deleteOpenaiProvider(${index})">${i18n.t('settings.btn.delete')}</button>
             </div>
         `;
         list.appendChild(providerItem);
@@ -80,7 +80,7 @@ function renderOpenaiProviders() {
 
 function showOpenaiProviderModal(editIndex = null) {
     currentProviderEditIndex = editIndex;
-    providerModalTitle.textContent = editIndex !== null ? 'Edit Provider' : 'Add Provider';
+    providerModalTitle.textContent = editIndex !== null ? i18n.t('settings.modal.edit-provider') : i18n.t('settings.modal.add-provider');
     providerNameInput.value = '';
     providerBaseUrlInput.value = '';
     providerHeadersInput.value = '';
@@ -197,8 +197,8 @@ function saveOpenaiProvider() {
 function editOpenaiProvider(index) { showOpenaiProviderModal(index); }
 function deleteOpenaiProvider(index) {
     showConfirmDialog(
-        'Confirm Delete',
-        'Are you sure you want to delete this OpenAI compatibility provider? This action cannot be undone.',
+        i18n.t('settings.confirm.title'),
+        i18n.t('settings.confirm.delete-provider'),
         () => { openaiProviders.splice(index, 1); renderOpenaiProviders(); }
     );
 }

@@ -33,7 +33,6 @@ use tauri::{Emitter, Manager, WebviewUrl, WebviewWindowBuilder};
 use thiserror::Error;
 use tokio::time::sleep;
 
-static PROCESS: Lazy<Arc<Mutex<Option<Child>>>> = Lazy::new(|| Arc::new(Mutex::new(None)));
 static PROCESS_PID: Lazy<Arc<Mutex<Option<u32>>>> = Lazy::new(|| Arc::new(Mutex::new(None)));
 static TRAY_ICON: Lazy<Arc<Mutex<Option<TrayIcon>>>> = Lazy::new(|| Arc::new(Mutex::new(None)));
 static CALLBACK_SERVERS: Lazy<Arc<Mutex<HashMap<u16, (Arc<AtomicBool>, thread::JoinHandle<()>)>>>> =
@@ -105,6 +104,7 @@ struct Asset {
 }
 
 #[derive(Serialize)]
+#[allow(non_snake_case)]
 struct OpResult {
     success: bool,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -437,11 +437,6 @@ async fn check_version_and_download(
     }))
 }
 
-#[derive(Deserialize)]
-struct DownloadArgs {
-    proxy_url: Option<String>,
-}
-
 #[tauri::command]
 async fn download_cliproxyapi(
     window: tauri::Window,
@@ -681,13 +676,6 @@ fn read_config_yaml() -> Result<serde_json::Value, String> {
     Ok(json_v)
 }
 
-#[derive(Deserialize)]
-struct UpdateConfigArgs {
-    endpoint: String,
-    value: serde_json::Value,
-    isDelete: Option<bool>,
-}
-
 #[tauri::command]
 fn update_config_yaml(
     endpoint: String,
@@ -912,94 +900,6 @@ fn generate_random_password() -> String {
             CHARSET[idx] as char
         })
         .collect()
-}
-
-fn start_monitor(app: tauri::AppHandle) {
-    let proc_ref = Arc::clone(&PROCESS);
-    thread::spawn(move || {
-        loop {
-            let mut remove = false;
-            let mut exit_code: Option<i32> = None;
-            {
-                let mut guard = proc_ref.lock();
-                if let Some(child) = guard.as_mut() {
-                    match child.try_wait() {
-                        Ok(Some(status)) => {
-                            exit_code = status.code();
-                            remove = true;
-                        }
-                        Ok(None) => {
-                            // Still running
-                        }
-                        Err(_) => {
-                            // Treat as closed
-                            remove = true;
-                        }
-                    }
-                } else {
-                    // No process
-                    break;
-                }
-            }
-            if remove {
-                // Clear stored process
-                *proc_ref.lock() = None;
-                // Stop keep-alive mechanism when process exits
-                stop_keep_alive_internal();
-                // Emit event
-                if let Some(code) = exit_code {
-                    println!("[CLIProxyAPI][EXIT] process exited with code {}", code);
-                } else {
-                    println!("[CLIProxyAPI][EXIT] process closed (no exit code)");
-                }
-                if let Some(code) = exit_code {
-                    let _ = app.emit("process-exit-error", json!({"code": code}));
-                } else {
-                    let _ = app.emit(
-                        "process-closed",
-                        json!({"message": "CLIProxyAPI process has closed"}),
-                    );
-                }
-                // Remove tray icon when process exits
-                let _ = TRAY_ICON.lock().take();
-                break;
-            }
-            thread::sleep(Duration::from_millis(1000));
-        }
-    });
-}
-
-fn pipe_child_output(child: &mut Child) {
-    // Pipe STDOUT
-    if let Some(out) = child.stdout.take() {
-        thread::spawn(move || {
-            let reader = BufReader::new(out);
-            for line in reader.lines() {
-                match line {
-                    Ok(l) => println!("[CLIProxyAPI][STDOUT] {}", l),
-                    Err(e) => {
-                        eprintln!("[CLIProxyAPI][STDOUT][ERROR] {}", e);
-                        break;
-                    }
-                }
-            }
-        });
-    }
-    // Pipe STDERR
-    if let Some(err) = child.stderr.take() {
-        thread::spawn(move || {
-            let reader = BufReader::new(err);
-            for line in reader.lines() {
-                match line {
-                    Ok(l) => eprintln!("[CLIProxyAPI][STDERR] {}", l),
-                    Err(e) => {
-                        eprintln!("[CLIProxyAPI][STDERR][ERROR] {}", e);
-                        break;
-                    }
-                }
-            }
-        });
-    }
 }
 
 // Kill any process using the specified port
@@ -1343,17 +1243,6 @@ fn restart_cliproxyapi(app: tauri::AppHandle) -> Result<(), String> {
         let _ = w.emit("cliproxyapi-restarted", json!({"version": ver}));
     }
     Ok(())
-}
-
-fn stop_process_internal() {
-    // Process is detached, don't try to kill it
-    // Just stop keep-alive mechanism
-    stop_keep_alive_internal();
-    // Clear stored password when app stops
-    *CLI_PROXY_PASSWORD.lock() = None;
-    println!(
-        "[CLIProxyAPI][INFO] EasyCLI app closing - CLIProxyAPI will continue running in background"
-    );
 }
 
 fn create_tray(app: &tauri::AppHandle) -> tauri::Result<()> {

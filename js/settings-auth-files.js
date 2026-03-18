@@ -50,9 +50,9 @@ function renderAuthFiles() {
             <div class="auth-file-info">
                 <div class="auth-file-name">${file.name}</div>
                 <div class="auth-file-details">
-                    <span class="auth-file-type">Type: ${file.type || 'unknown'}</span>
+                    <span class="auth-file-type">${i18n.t('settings.auth.file.type')} ${file.type || 'unknown'}</span>
                     <span class="auth-file-size">${fileSize}</span>
-                    <span>Modified: ${modTime}</span>
+                    <span>${i18n.t('settings.auth.file.modified')} ${modTime}</span>
                 </div>
             </div>
         `;
@@ -68,8 +68,8 @@ function showEmptyAuthFiles() {
     authFilesList.innerHTML = `
         <div class="empty-state">
             <div class="empty-state-icon">📁</div>
-            <div class="empty-state-text">No authentication files</div>
-            <div class="empty-state-subtitle">Upload authentication files to manage them here</div>
+            <div class="empty-state-text">${i18n.t('settings.auth.empty')}</div>
+            <div class="empty-state-subtitle">${i18n.t('settings.auth.empty.sub')}</div>
         </div>
     `;
     updateActionButtons();
@@ -99,7 +99,7 @@ function updateActionButtons() {
         deleteBtn.style.display = 'block';
         newDropdown.style.display = 'block';
         downloadBtn.style.display = 'block';
-        selectAllBtn.textContent = allSelected ? 'Unselect All' : 'Select All';
+        selectAllBtn.textContent = allSelected ? i18n.t('settings.btn.unselect-all') : i18n.t('settings.btn.select-all');
         deleteBtn.disabled = !hasSelection;
         downloadBtn.disabled = !hasSelection;
     } else if (currentTab === 'access-token' || currentTab === 'api' || currentTab === 'openai' || currentTab === 'basic') {
@@ -130,13 +130,12 @@ function toggleSelectAllAuthFiles() {
 async function deleteSelectedAuthFiles() {
     if (selectedAuthFiles.size === 0 || deleteBtn.disabled) return;
     const fileCount = selectedAuthFiles.size;
-    const fileText = fileCount === 1 ? 'file' : 'files';
     showConfirmDialog(
-        'Confirm Delete',
-        `Are you sure you want to delete ${fileCount} authentication ${fileText}?\nThis action cannot be undone.`,
+        i18n.t('settings.confirm.title'),
+        i18n.t('settings.confirm.delete-auth-files').replace('{count}', fileCount),
         async () => {
             deleteBtn.disabled = true;
-            deleteBtn.textContent = 'Deleting...';
+            deleteBtn.textContent = i18n.t('settings.btn.deleting');
             try {
                 const result = await configManager.deleteAuthFiles(Array.from(selectedAuthFiles));
                 if (result.success) {
@@ -155,7 +154,7 @@ async function deleteSelectedAuthFiles() {
                 showError('Network error');
             } finally {
                 deleteBtn.disabled = false;
-                deleteBtn.textContent = 'Delete';
+                deleteBtn.textContent = i18n.t('settings.btn.delete');
                 updateActionButtons();
             }
         }
@@ -363,7 +362,7 @@ async function uploadSingleFile(file, apiUrl, password) {
 async function downloadSelectedAuthFiles() {
     if (selectedAuthFiles.size === 0 || downloadBtn.disabled) return;
     downloadBtn.disabled = true;
-    downloadBtn.textContent = 'Downloading...';
+    downloadBtn.textContent = i18n.t('settings.btn.downloading');
     try {
         const result = await configManager.downloadAuthFiles(Array.from(selectedAuthFiles));
         if (result.success && result.successCount > 0) {
@@ -380,7 +379,7 @@ async function downloadSelectedAuthFiles() {
         showError('Failed to download files');
     } finally {
         downloadBtn.disabled = false;
-        downloadBtn.textContent = 'Download';
+        downloadBtn.textContent = i18n.t('settings.btn.download');
     }
 }
 

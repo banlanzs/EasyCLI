@@ -92,8 +92,8 @@ function renderGeminiKeys() {
         list.innerHTML = `
             <div class="empty-state">
                 <div class="empty-state-icon">🔑</div>
-                <div class="empty-state-text">No Gemini API Keys</div>
-                <div class="empty-state-subtitle">Add your first Gemini API key to get started</div>
+                <div class="empty-state-text">${i18n.t('settings.gemini.empty')}</div>
+                <div class="empty-state-subtitle">${i18n.t('settings.gemini.empty.sub')}</div>
             </div>
         `;
         return;
@@ -110,13 +110,13 @@ function renderGeminiKeys() {
             <div class="api-key-info">
                 <div class="api-key-value">${keyObj['api-key'] || ''}</div>
                 ${baseUrl ? `<div class="api-key-base-url">Base URL: ${baseUrl}</div>` : ''}
-                ${proxyUrl ? `<div class="api-key-proxy-url">Proxy URL: ${proxyUrl}</div>` : ''}
-                ${excluded ? `<div class="api-key-excluded">Excluded: ${excluded}</div>` : ''}
-                ${headersText ? `<div class="api-key-headers">Headers: ${headersText}</div>` : ''}
+                ${proxyUrl ? `<div class="api-key-proxy-url">${i18n.t('settings.modal.proxy-url.label')}: ${proxyUrl}</div>` : ''}
+                ${excluded ? `<div class="api-key-excluded">${i18n.t('settings.modal.excluded.label')}: ${excluded}</div>` : ''}
+                ${headersText ? `<div class="api-key-headers">${i18n.t('settings.modal.headers.label')}: ${headersText}</div>` : ''}
             </div>
             <div class="api-key-actions">
-                <button class="api-key-btn edit" onclick="editGeminiKey(${index})">Edit</button>
-                <button class="api-key-btn delete" onclick="deleteGeminiKey(${index})">Delete</button>
+                <button class="api-key-btn edit" onclick="editGeminiKey(${index})">${i18n.t('settings.btn.edit')}</button>
+                <button class="api-key-btn delete" onclick="deleteGeminiKey(${index})">${i18n.t('settings.btn.delete')}</button>
             </div>
         `;
         list.appendChild(keyItem);
@@ -132,8 +132,8 @@ function renderCodexKeys() {
         list.innerHTML = `
             <div class="empty-state">
                 <div class="empty-state-icon">🔑</div>
-                <div class="empty-state-text">No Codex API Keys</div>
-                <div class="empty-state-subtitle">Add your first Codex API key to get started</div>
+                <div class="empty-state-text">${i18n.t('settings.codex.empty')}</div>
+                <div class="empty-state-subtitle">${i18n.t('settings.codex.empty.sub')}</div>
             </div>
         `;
         return;
@@ -150,13 +150,13 @@ function renderCodexKeys() {
             <div class="api-key-info">
                 <div class="api-key-value">${keyObj['api-key']}</div>
                 ${baseUrl ? `<div class=\"api-key-base-url\">Base URL: ${baseUrl}</div>` : ''}
-                ${proxyUrl ? `<div class=\"api-key-proxy-url\">Proxy URL: ${proxyUrl}</div>` : ''}
-                ${excluded ? `<div class=\"api-key-excluded\">Excluded: ${excluded}</div>` : ''}
-                ${headersText ? `<div class=\"api-key-headers\">Headers: ${headersText}</div>` : ''}
+                ${proxyUrl ? `<div class=\"api-key-proxy-url\">${i18n.t('settings.modal.proxy-url.label')}: ${proxyUrl}</div>` : ''}
+                ${excluded ? `<div class=\"api-key-excluded\">${i18n.t('settings.modal.excluded.label')}: ${excluded}</div>` : ''}
+                ${headersText ? `<div class=\"api-key-headers\">${i18n.t('settings.modal.headers.label')}: ${headersText}</div>` : ''}
             </div>
             <div class="api-key-actions">
-                <button class="api-key-btn edit" onclick="editCodexKey(${index})">Edit</button>
-                <button class="api-key-btn delete" onclick="deleteCodexKey(${index})">Delete</button>
+                <button class="api-key-btn edit" onclick="editCodexKey(${index})">${i18n.t('settings.btn.edit')}</button>
+                <button class="api-key-btn delete" onclick="deleteCodexKey(${index})">${i18n.t('settings.btn.delete')}</button>
             </div>
         `;
         list.appendChild(keyItem);
@@ -172,8 +172,8 @@ function renderClaudeKeys() {
         list.innerHTML = `
             <div class="empty-state">
                 <div class="empty-state-icon">🔑</div>
-                <div class="empty-state-text">No Claude API Keys</div>
-                <div class="empty-state-subtitle">Add your first Claude API key to get started</div>
+                <div class="empty-state-text">${i18n.t('settings.claude.empty')}</div>
+                <div class="empty-state-subtitle">${i18n.t('settings.claude.empty.sub')}</div>
             </div>
         `;
         return;
@@ -190,13 +190,13 @@ function renderClaudeKeys() {
             <div class="api-key-info">
                 <div class="api-key-value">${keyObj['api-key']}</div>
                 ${baseUrl ? `<div class=\"api-key-base-url\">Base URL: ${baseUrl}</div>` : ''}
-                ${proxyUrl ? `<div class=\"api-key-proxy-url\">Proxy URL: ${proxyUrl}</div>` : ''}
-                ${excluded ? `<div class=\"api-key-excluded\">Excluded: ${excluded}</div>` : ''}
-                ${headersText ? `<div class=\"api-key-headers\">Headers: ${headersText}</div>` : ''}
+                ${proxyUrl ? `<div class=\"api-key-proxy-url\">${i18n.t('settings.modal.proxy-url.label')}: ${proxyUrl}</div>` : ''}
+                ${excluded ? `<div class=\"api-key-excluded\">${i18n.t('settings.modal.excluded.label')}: ${excluded}</div>` : ''}
+                ${headersText ? `<div class=\"api-key-headers\">${i18n.t('settings.modal.headers.label')}: ${headersText}</div>` : ''}
             </div>
             <div class="api-key-actions">
-                <button class="api-key-btn edit" onclick="editClaudeKey(${index})">Edit</button>
-                <button class="api-key-btn delete" onclick="deleteClaudeKey(${index})">Delete</button>
+                <button class="api-key-btn edit" onclick="editClaudeKey(${index})">${i18n.t('settings.btn.edit')}</button>
+                <button class="api-key-btn delete" onclick="deleteClaudeKey(${index})">${i18n.t('settings.btn.delete')}</button>
             </div>
         `;
         list.appendChild(keyItem);
@@ -207,7 +207,7 @@ function renderClaudeKeys() {
 function showApiKeyModal(type, editIndex = null) {
     currentApiType = type;
     currentEditIndex = editIndex;
-    modalTitle.textContent = editIndex !== null ? 'Edit API Key' : 'Add API Key';
+    modalTitle.textContent = editIndex !== null ? i18n.t('settings.modal.edit-api-key') : i18n.t('settings.modal.add-api-key');
     apiKeyInput.value = '';
     baseUrlInput.value = '';
     apiKeyProxyUrlInput.value = '';
@@ -397,34 +397,25 @@ function editClaudeKey(index) { showApiKeyModal('claude', index); }
 
 function deleteGeminiKey(index) {
     showConfirmDialog(
-        'Confirm Delete',
-        'Are you sure you want to delete this Gemini API key? This action cannot be undone.',
-        () => {
-            geminiKeys.splice(index, 1);
-            renderGeminiKeys();
-        }
+        i18n.t('settings.confirm.title'),
+        i18n.t('settings.confirm.delete-key'),
+        () => { geminiKeys.splice(index, 1); renderGeminiKeys(); }
     );
 }
 
 function deleteCodexKey(index) {
     showConfirmDialog(
-        'Confirm Delete',
-        'Are you sure you want to delete this Codex API key? This action cannot be undone.',
-        () => {
-            codexKeys.splice(index, 1);
-            renderCodexKeys();
-        }
+        i18n.t('settings.confirm.title'),
+        i18n.t('settings.confirm.delete-key'),
+        () => { codexKeys.splice(index, 1); renderCodexKeys(); }
     );
 }
 
 function deleteClaudeKey(index) {
     showConfirmDialog(
-        'Confirm Delete',
-        'Are you sure you want to delete this Claude API key? This action cannot be undone.',
-        () => {
-            claudeKeys.splice(index, 1);
-            renderClaudeKeys();
-        }
+        i18n.t('settings.confirm.title'),
+        i18n.t('settings.confirm.delete-key'),
+        () => { claudeKeys.splice(index, 1); renderClaudeKeys(); }
     );
 }
 

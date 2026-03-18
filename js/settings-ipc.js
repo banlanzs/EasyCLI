@@ -22,7 +22,7 @@ if (window.__TAURI__?.event?.listen) {
                 console.error('Error stopping keep-alive on process close:', error);
             });
         }
-        showProcessClosedError(data.message || 'CLIProxyAPI process has closed');
+        showProcessClosedError(data.message || i18n.t('msg.process-closed'));
     });
 
     window.__TAURI__.event.listen('process-exit-error', (event) => {
@@ -46,6 +46,6 @@ if (window.__TAURI__?.event?.listen) {
                 console.error('Error starting keep-alive on process restart:', error);
             });
         }
-        showSuccessMessage('CLIProxyAPI process restarted successfully!');
+        showSuccessMessage(i18n.t('msg.restarted'));
     });
 }

@@ -4,7 +4,8 @@
   "description": "EasyCLI - A Tauri-based desktop GUI for CLIProxyAPI",
   "scripts": {
     "dev": "tauri dev",
-    "build": "tauri build",
+    "build": "tauri build --target x86_64-pc-windows-msvc",
+    "build:portable": "tauri build --target x86_64-pc-windows-msvc && node scripts/pack-portable.js",
     "tauri": "tauri",
     "test": "echo \"Error: no test specified\" && exit 1"
   },

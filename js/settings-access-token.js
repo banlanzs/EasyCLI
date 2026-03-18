@@ -57,8 +57,8 @@ function renderAccessTokenKeysList(mode) {
         list.innerHTML = `
             <div class="empty-state">
                 <div class="empty-state-icon">🔑</div>
-                <div class="empty-state-text">No Access Tokens</div>
-                <div class="empty-state-subtitle">Add your first access token to get started</div>
+                <div class="empty-state-text">${i18n.t('settings.access-token.empty')}</div>
+                <div class="empty-state-subtitle">${i18n.t('settings.access-token.empty.sub')}</div>
             </div>
         `;
         return;
@@ -73,8 +73,8 @@ function renderAccessTokenKeysList(mode) {
                 <div class="api-key-value">${key}</div>
             </div>
             <div class="api-key-actions">
-                <button class="api-key-btn edit" onclick="editAccessTokenKey(${index})">Edit</button>
-                <button class="api-key-btn delete" onclick="deleteAccessTokenKey(${index})">Delete</button>
+                <button class="api-key-btn edit" onclick="editAccessTokenKey(${index})">${i18n.t('settings.btn.edit')}</button>
+                <button class="api-key-btn delete" onclick="deleteAccessTokenKey(${index})">${i18n.t('settings.btn.delete')}</button>
             </div>
         `;
         list.appendChild(keyItem);
@@ -84,7 +84,7 @@ function renderAccessTokenKeysList(mode) {
 function showAccessTokenModal(mode, editIndex = null) {
     currentAccessTokenMode = mode;
     currentAccessTokenEditIndex = editIndex;
-    accessTokenModalTitle.textContent = editIndex !== null ? 'Edit Access Token' : 'Add Access Token';
+    accessTokenModalTitle.textContent = editIndex !== null ? i18n.t('settings.access-token.modal.edit') : i18n.t('settings.access-token.modal.add');
     accessTokenInput.value = '';
     clearAccessTokenFormErrors();
     if (editIndex !== null) {
@@ -147,12 +147,9 @@ function editAccessTokenKey(index) {
 
 function deleteAccessTokenKey(index) {
     showConfirmDialog(
-        'Confirm Delete',
-        'Are you sure you want to delete this access token?\nThis action cannot be undone.',
-        () => {
-            accessTokenKeys.splice(index, 1);
-            renderAccessTokenKeys();
-        }
+        i18n.t('settings.confirm.title'),
+        i18n.t('settings.confirm.delete-token'),
+        () => { accessTokenKeys.splice(index, 1); renderAccessTokenKeys(); }
     );
 }
 

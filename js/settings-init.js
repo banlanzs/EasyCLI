@@ -33,7 +33,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
     } catch (error) {
         console.error('Error initializing settings:', error);
-        showError('Failed to load settings');
+        showError(i18n.t('msg.failed-load'));
     }
 });
 

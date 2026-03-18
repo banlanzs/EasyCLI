@@ -94,16 +94,16 @@ function updateServerStatus() {
     const connectionType = localStorage.getItem('type') || 'local';
 
     if (connectionType === 'local') {
-        serverStatusText.innerHTML = '<span style="color: #10b981;">●</span> Local';
+        serverStatusText.innerHTML = `<span style="color: #10b981;">●</span> ${i18n.t('settings.server.local')}`;
     } else {
         configManager.refreshConnection();
         const storedBaseUrl = localStorage.getItem('base-url');
         const baseUrl = storedBaseUrl || configManager.baseUrl;
 
         if (baseUrl) {
-            serverStatusText.innerHTML = `Remote:<br><span style="color: #10b981;">●</span> ${baseUrl}`;
+            serverStatusText.innerHTML = `${i18n.t('settings.server.remote')}<br><span style="color: #10b981;">●</span> ${baseUrl}`;
         } else {
-            serverStatusText.innerHTML = 'Remote:<br><span style="color: #10b981;">●</span> Unknown';
+            serverStatusText.innerHTML = `${i18n.t('settings.server.remote')}<br><span style="color: #10b981;">●</span> ${i18n.t('settings.server.unknown')}`;
         }
     }
 }
@@ -158,24 +158,24 @@ autoStartSwitch.addEventListener('change', async () => {
             if (autoStartSwitch.checked) {
                 const result = await window.__TAURI__.core.invoke('enable_auto_start');
                 if (result.success) {
-                    showSuccessMessage('Auto-start enabled successfully');
+                    showSuccessMessage(i18n.t('msg.auto-start-enabled'));
                 } else {
-                    showError('Failed to enable auto-start');
+                    showError(i18n.t('msg.auto-start-enable-failed'));
                     autoStartSwitch.checked = false;
                 }
             } else {
                 const result = await window.__TAURI__.core.invoke('disable_auto_start');
                 if (result.success) {
-                    showSuccessMessage('Auto-start disabled successfully');
+                    showSuccessMessage(i18n.t('msg.auto-start-disabled'));
                 } else {
-                    showError('Failed to disable auto-start');
+                    showError(i18n.t('msg.auto-start-disable-failed'));
                     autoStartSwitch.checked = true;
                 }
             }
         }
     } catch (error) {
         console.error('Error toggling auto-start:', error);
-        showError('Failed to update auto-start setting');
+        showError(i18n.t('msg.auto-start-update-failed'));
         // Revert the toggle
         autoStartSwitch.checked = !autoStartSwitch.checked;
     }
@@ -205,7 +205,7 @@ async function updateSetting(endpoint, value, isDelete = false) {
 // Apply settings for the current tab
 async function applyAllSettings() {
     applyBtn.disabled = true;
-    applyBtn.textContent = 'Applying...';
+    applyBtn.textContent = i18n.t('settings.btn.applying');
 
     try {
         const serverConfig = await getCurrentConfig();
@@ -307,9 +307,8 @@ async function applyAllSettings() {
         }
 
         if (changes.length === 0) {
-            const tabName = currentTab === 'basic' ? 'Basic Settings' :
-                currentTab === 'api' ? 'Third Party API Keys' : 'Settings';
-            showSuccessMessage(`No changes to apply in ${tabName.toLowerCase()}`);
+            const tabName = i18n.t(`tab.${currentTab}`);
+            showSuccessMessage(`${i18n.t('msg.no-changes')} ${tabName.toLowerCase()}`);
         } else if (successCount === changes.length) {
             const updatedConfig = await getCurrentConfig();
             originalConfig = updatedConfig;
@@ -329,28 +328,25 @@ async function applyAllSettings() {
                 await loadOpenaiProviders();
             }
 
-            const tabName = currentTab === 'basic' ? 'Basic Settings' :
-                currentTab === 'access-token' ? 'Access Token' :
-                    currentTab === 'api' ? 'Third Party API Keys' :
-                        currentTab === 'openai' ? 'OpenAI Compatibility' : 'Settings';
-            showSuccessMessage(`Applied ${successCount} ${tabName.toLowerCase()} setting(s) successfully`);
+            const tabName = i18n.t(`tab.${currentTab}`);
+            showSuccessMessage(`${i18n.t('msg.applied')} ${successCount} ${tabName.toLowerCase()} ${i18n.t('msg.settings')}`);
 
             if (portChanged && localStorage.getItem('type') === 'local') {
                 console.log('Port configuration has changed, need to restart CLIProxyAPI process');
-                showSuccessMessage('Port configuration saved, restarting CLIProxyAPI process...');
+                showSuccessMessage(i18n.t('msg.port-restart'));
                 if (window.__TAURI__?.core?.invoke) {
                     window.__TAURI__.core.invoke('restart_cliproxyapi');
                 }
             }
         } else {
-            showError(`Failed to apply ${changes.length - successCount} setting(s)`);
+            showError(`${i18n.t('msg.failed')} ${changes.length - successCount} ${i18n.t('msg.settings')}`);
         }
     } catch (error) {
         console.error('Error applying settings:', error);
-        showError('Network error');
+        showError(i18n.t('msg.network-error'));
     } finally {
         applyBtn.disabled = false;
-        applyBtn.textContent = 'Apply';
+        applyBtn.textContent = i18n.t('settings.btn.apply');
     }
 }
 
@@ -408,14 +404,11 @@ async function resetAllSettings() {
         }
 
         originalConfig = serverConfig;
-        const tabName = currentTab === 'basic' ? 'Basic Settings' :
-            currentTab === 'access-token' ? 'Access Token' :
-                currentTab === 'api' ? 'Third Party API Keys' :
-                    currentTab === 'openai' ? 'OpenAI Compatibility' : 'Settings';
-        showSuccessMessage(`${tabName} reset to server config`);
+        const tabName = i18n.t(`tab.${currentTab}`);
+        showSuccessMessage(`${tabName} ${i18n.t('msg.reset')}`);
     } catch (error) {
         console.error('Error resetting settings:', error);
-        showError('Failed to reset settings');
+        showError(i18n.t('msg.failed-reset'));
     }
 }
 
