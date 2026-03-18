@@ -228,13 +228,13 @@ function addApiKeyRow() {
     const apiKeyInput = document.createElement('input');
     apiKeyInput.type = 'text';
     apiKeyInput.className = 'form-input dynamic-input';
-    apiKeyInput.placeholder = 'Enter API key';
+    apiKeyInput.placeholder = i18n.t('placeholder.api-key');
     apiKeyInput.required = true;
 
     const proxyUrlInput = document.createElement('input');
     proxyUrlInput.type = 'text';
     proxyUrlInput.className = 'form-input dynamic-input';
-    proxyUrlInput.placeholder = 'Proxy URL (optional)';
+    proxyUrlInput.placeholder = i18n.t('placeholder.proxy-optional');
 
     const addBtn = document.createElement('button');
     addBtn.type = 'button';
@@ -273,11 +273,11 @@ function addModelRow() {
     const modelNameInput = document.createElement('input');
     modelNameInput.type = 'text';
     modelNameInput.className = 'form-input dynamic-input';
-    modelNameInput.placeholder = 'Model name';
+    modelNameInput.placeholder = i18n.t('placeholder.model-name');
     const aliasInput = document.createElement('input');
     aliasInput.type = 'text';
     aliasInput.className = 'form-input dynamic-input';
-    aliasInput.placeholder = 'Alias name';
+    aliasInput.placeholder = i18n.t('placeholder.alias-name');
     const addBtn = document.createElement('button');
     addBtn.type = 'button';
     addBtn.className = 'add-row-btn';
@@ -327,14 +327,14 @@ function populateDynamicInputs(apiKeys, models) {
             const apiKeyInput = document.createElement('input');
             apiKeyInput.type = 'text';
             apiKeyInput.className = 'form-input dynamic-input';
-            apiKeyInput.placeholder = 'Enter API key';
+            apiKeyInput.placeholder = i18n.t('placeholder.api-key');
             apiKeyInput.required = true;
             apiKeyInput.value = apiKeyEntry['api-key'] || '';
 
             const proxyUrlInput = document.createElement('input');
             proxyUrlInput.type = 'text';
             proxyUrlInput.className = 'form-input dynamic-input';
-            proxyUrlInput.placeholder = 'Proxy URL (optional)';
+            proxyUrlInput.placeholder = i18n.t('placeholder.proxy-optional');
             proxyUrlInput.value = apiKeyEntry['proxy-url'] || '';
 
             const addBtn = document.createElement('button');
@@ -368,13 +368,13 @@ function populateDynamicInputs(apiKeys, models) {
             const modelNameInput = document.createElement('input');
             modelNameInput.type = 'text';
             modelNameInput.className = 'form-input dynamic-input';
-            modelNameInput.placeholder = 'Model name';
+            modelNameInput.placeholder = i18n.t('placeholder.model-name');
             modelNameInput.value = model.name || '';
 
             const aliasInput = document.createElement('input');
             aliasInput.type = 'text';
             aliasInput.className = 'form-input dynamic-input';
-            aliasInput.placeholder = 'Alias name';
+            aliasInput.placeholder = i18n.t('placeholder.alias-name');
             aliasInput.value = model.alias || '';
 
             const addBtn = document.createElement('button');

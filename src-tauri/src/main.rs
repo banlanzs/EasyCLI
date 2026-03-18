@@ -22,7 +22,7 @@ use std::os::unix::process::CommandExt;
 #[cfg(target_os = "windows")]
 use std::os::windows::process::CommandExt;
 use std::path::{Path, PathBuf};
-use std::process::{Child, Stdio};
+use std::process::Stdio;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use std::thread;
@@ -1255,8 +1255,8 @@ fn create_tray(app: &tauri::AppHandle) -> tauri::Result<()> {
         return Ok(());
     }
 
-    let open_settings = MenuItemBuilder::with_id("open_settings", "Open Settings").build(app)?;
-    let quit = MenuItemBuilder::with_id("quit", "Quit").build(app)?;
+    let open_settings = MenuItemBuilder::with_id("open_settings", "打开设置").build(app)?;
+    let quit = MenuItemBuilder::with_id("quit", "退出").build(app)?;
     let menu = MenuBuilder::new(app)
         .items(&[&open_settings, &quit])
         .build()?;

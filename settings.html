@@ -59,7 +59,7 @@
                         </div>
                         <div class="setting-control">
                             <input type="number" id="port-input" class="number-input" min="1" max="65535"
-                                placeholder="8080">
+                                data-i18n-placeholder="placeholder.port" placeholder="8080">
                         </div>
                     </div>
 
@@ -96,7 +96,7 @@
                         </div>
                         <div class="setting-control">
                             <input type="password" id="secret-key-input" class="form-input"
-                                placeholder="Enter secret key">
+                                data-i18n-placeholder="placeholder.secret-key" placeholder="Enter secret key">
                         </div>
                     </div>
 
@@ -120,7 +120,7 @@
                                 socks5://user:pass@127.0.0.1:1080/)</span>
                         </div>
                         <div class="setting-control">
-                            <input type="text" id="proxy-url-input" class="form-input" placeholder="Enter proxy URL">
+                            <input type="text" id="proxy-url-input" class="form-input" data-i18n-placeholder="placeholder.proxy-url" placeholder="Enter proxy URL">
                         </div>
                     </div>
 
@@ -143,7 +143,7 @@
                             <span class="setting-description" data-i18n="settings.basic.request-retry.desc">Number of retry attempts for failed requests</span>
                         </div>
                         <div class="setting-control">
-                            <input type="number" id="request-retry-input" class="number-input" min="0" placeholder="3">
+                            <input type="number" id="request-retry-input" class="number-input" min="0" data-i18n-placeholder="placeholder.request-retry" placeholder="3">
                         </div>
                     </div>
 
@@ -406,8 +406,8 @@
                         <label data-i18n="settings.modal.api-keys.label">API Keys <span class="required">*</span></label>
                         <div id="api-keys-container" class="dynamic-input-container">
                             <div class="dynamic-input-row">
-                                <input type="text" class="form-input dynamic-input" placeholder="Enter API key" required>
-                                <input type="text" class="form-input dynamic-input" placeholder="Proxy URL (optional)">
+                                <input type="text" class="form-input dynamic-input" data-i18n-placeholder="placeholder.api-key" placeholder="Enter API key" required>
+                                <input type="text" class="form-input dynamic-input" data-i18n-placeholder="placeholder.proxy-optional" placeholder="Proxy URL (optional)">
                                 <button type="button" class="add-row-btn" onclick="addApiKeyRow()">+</button>
                                 <button type="button" class="remove-row-btn" onclick="removeApiKeyRow(this.parentElement)">−</button>
                             </div>
@@ -418,8 +418,8 @@
                         <label data-i18n="settings.modal.models.label">Models</label>
                         <div id="models-container" class="dynamic-input-container">
                             <div class="dynamic-input-row">
-                                <input type="text" class="form-input dynamic-input" placeholder="Model name">
-                                <input type="text" class="form-input dynamic-input" placeholder="Alias name">
+                                <input type="text" class="form-input dynamic-input" data-i18n-placeholder="placeholder.model-name" placeholder="Model name">
+                                <input type="text" class="form-input dynamic-input" data-i18n-placeholder="placeholder.alias-name" placeholder="Alias name">
                                 <button type="button" class="add-row-btn" onclick="addModelRow()">+</button>
                                 <button type="button" class="remove-row-btn" onclick="removeModelRow(this.parentElement)">−</button>
                             </div>
@@ -450,7 +450,7 @@
             <button class="reset-btn" id="reset-btn">Reset</button>
             <button class="apply-btn" id="apply-btn">Apply</button>
             <div class="dropdown-container" id="new-dropdown" style="display: none;">
-                <button class="new-btn" id="new-btn">New</button>
+                <button class="new-btn" id="new-btn" data-i18n="settings.btn.new">New</button>
                 <div class="dropdown-menu" id="dropdown-menu">
                     <div class="dropdown-item" data-type="gemini">Gemini CLI</div>
                     <div class="dropdown-item" data-type="gemini-web" style="display: none;">Gemini WEB</div>

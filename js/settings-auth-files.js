@@ -225,15 +225,15 @@ function showGeminiWebDialog() {
                     <p>Please enter your Gemini Web cookies:</p>
                     <div class="form-group">
                         <label for="gemini-web-secure-1psid-input">Secure-1PSID:</label>
-                        <input type="text" id="gemini-web-secure-1psid-input" class="form-input" placeholder="Enter Secure-1PSID">
+                        <input type="text" id="gemini-web-secure-1psid-input" class="form-input" placeholder="${i18n.t('placeholder.gemini-web-secure-1psid')}">
                     </div>
                     <div class="form-group">
                         <label for="gemini-web-secure-1psidts-input">Secure-1PSIDTS:</label>
-                        <input type="text" id="gemini-web-secure-1psidts-input" class="form-input" placeholder="Enter Secure-1PSIDTS">
+                        <input type="text" id="gemini-web-secure-1psidts-input" class="form-input" placeholder="${i18n.t('placeholder.gemini-web-secure-1psidts')}">
                     </div>
                     <div class="form-group">
                         <label for="gemini-web-email-input" style="text-align: left;">Email:</label>
-                        <input type="email" id="gemini-web-email-input" class="form-input" placeholder="Enter your email address">
+                        <input type="email" id="gemini-web-email-input" class="form-input" placeholder="${i18n.t('placeholder.gemini-web-email')}">
                     </div>
                     <div class="auth-actions">
                         <button type="button" id="gemini-web-confirm-btn" class="btn-primary">Confirm</button>

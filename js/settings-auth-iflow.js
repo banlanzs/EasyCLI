@@ -19,7 +19,7 @@ function showIFlowCookieDialog() {
                     <p>Paste your iFlow cookie to save it as an authentication file.</p>
                     <div class="form-group">
                         <label for="iflow-cookie-input">Cookie <span class="required">*</span></label>
-                        <textarea id="iflow-cookie-input" class="form-input" rows="4" placeholder="Paste iFlow cookie here"></textarea>
+                        <textarea id="iflow-cookie-input" class="form-input" rows="4" placeholder="${i18n.t('placeholder.iflow-cookie')}"></textarea>
                         <small class="form-help">Cookie is required and must not be empty.</small>
                     </div>
                     <div class="auth-actions">

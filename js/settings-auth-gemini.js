@@ -23,7 +23,7 @@ function showGeminiProjectIdDialog() {
                 <div class="codex-auth-content">
                     <p>Please enter Google Cloud Project ID (optional):</p>
                     <div class="form-group">
-                        <input type="text" id="gemini-project-id-input" class="form-input" placeholder="Enter Project ID (optional)">
+                        <input type="text" id="gemini-project-id-input" class="form-input" placeholder="${i18n.t('placeholder.gemini-project-id')}">
                         <small class="form-help">If no Project ID is entered, the default project will be used</small>
                     </div>
                     <div class="auth-actions">
