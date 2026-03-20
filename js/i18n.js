@@ -36,6 +36,18 @@ const I18N_TRANSLATIONS = {
     'settings.basic.port.desc': 'Server port number (default: 8080)',
     'settings.basic.allow-remote.label': 'Allow Remote Management',
     'settings.basic.allow-remote.desc': 'Allow remote management access from other hosts',
+    'settings.basic.auto-update.label': 'Auto Update CLIProxyAPI',
+    'settings.basic.auto-update.desc': 'Automatically check and download CLIProxyAPI updates on connect',
+    'settings.update.check-btn': 'Check for Updates',
+    'settings.update.checking': 'Checking...',
+    'settings.update.downloading': 'Downloading...',
+    'settings.update.up-to-date': 'Already up to date',
+    'settings.update.current-version': 'Current version:',
+    'settings.update.latest-version': 'Latest version:',
+    'settings.update.confirm': 'Update available: {current} → {latest}. Update now?',
+    'settings.update.success': 'Updated to {version} successfully',
+    'settings.update.failed': 'Update failed:',
+    'settings.update.no-local': 'CLIProxyAPI not installed',
     'settings.basic.auto-start.label': 'Start at Login',
     'settings.basic.auto-start.desc': 'Launch EasyCLI automatically when you log in',
     'settings.basic.secret-key.label': 'Remote Management Secret Key',
@@ -221,6 +233,18 @@ const I18N_TRANSLATIONS = {
     'settings.basic.port.desc': '服务器端口号（默认：8080）',
     'settings.basic.allow-remote.label': '允许远程管理',
     'settings.basic.allow-remote.desc': '允许其他主机进行远程管理访问',
+    'settings.basic.auto-update.label': '自动更新 CLIProxyAPI',
+    'settings.basic.auto-update.desc': '连接时自动检查并下载 CLIProxyAPI 更新',
+    'settings.update.check-btn': '检查更新',
+    'settings.update.checking': '检查中...',
+    'settings.update.downloading': '下载中...',
+    'settings.update.up-to-date': '已是最新版本',
+    'settings.update.current-version': '当前版本：',
+    'settings.update.latest-version': '最新版本：',
+    'settings.update.confirm': '发现新版本：{current} → {latest}，是否立即更新？',
+    'settings.update.success': '已成功更新到 {version}',
+    'settings.update.failed': '更新失败：',
+    'settings.update.no-local': 'CLIProxyAPI 未安装',
     'settings.basic.auto-start.label': '开机自启',
     'settings.basic.auto-start.desc': '登录时自动启动 EasyCLI',
     'settings.basic.secret-key.label': '远程管理密钥',
@@ -415,6 +439,11 @@ const i18n = {
     document.querySelectorAll('[data-i18n-title]').forEach(el => {
       el.title = this.t(el.getAttribute('data-i18n-title'));
     });
+    // Update active state on lang buttons
+    const btnZh = document.getElementById('lang-btn-zh');
+    const btnEn = document.getElementById('lang-btn-en');
+    if (btnZh) btnZh.classList.toggle('active', this._lang === 'zh');
+    if (btnEn) btnEn.classList.toggle('active', this._lang === 'en');
   }
 };
 

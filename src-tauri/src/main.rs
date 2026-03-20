@@ -360,14 +360,28 @@ fn parse_proxy_url(proxy_url: &str) -> Result<ProxyConfig, String> {
 async fn fetch_latest_release(proxy_url: String) -> Result<VersionInfo, AppError> {
     let client = parse_proxy(&proxy_url, reqwest::Client::builder())
         .user_agent("EasyCLI")
+        .timeout(Duration::from_secs(15))
         .build()?;
-    let resp = client
-        .get("https://api.github.com/repos/luispater/CLIProxyAPI/releases/latest")
-        .header("Accept", "application/vnd.github.v3+json")
-        .send()
-        .await?
-        .error_for_status()?;
-    Ok(resp.json::<VersionInfo>().await?)
+
+    let mut last_err = None;
+    for attempt in 0..3 {
+        if attempt > 0 {
+            sleep(Duration::from_secs(2)).await;
+        }
+        match client
+            .get("https://api.github.com/repos/luispater/CLIProxyAPI/releases/latest")
+            .header("Accept", "application/vnd.github.v3+json")
+            .send()
+            .await
+        {
+            Ok(resp) => match resp.error_for_status() {
+                Ok(r) => return Ok(r.json::<VersionInfo>().await?),
+                Err(e) => last_err = Some(AppError::Http(e)),
+            },
+            Err(e) => last_err = Some(AppError::Http(e)),
+        }
+    }
+    Err(last_err.unwrap_or_else(|| AppError::Other("Failed to fetch release info".into())))
 }
 
 #[tauri::command]
@@ -383,9 +397,16 @@ async fn check_version_and_download(
     window
         .emit("download-status", json!({"status": "checking"}))
         .ok();
-    let release = fetch_latest_release(proxy.clone())
-        .await
-        .map_err(|e| e.to_string())?;
+    let release = match fetch_latest_release(proxy.clone()).await {
+        Ok(r) => r,
+        Err(e) => {
+            let msg = e.to_string();
+            window
+                .emit("download-status", json!({"status": "failed", "error": msg}))
+                .ok();
+            return Ok(json!({"success": false, "error": msg}));
+        }
+    };
     let latest = release.tag_name.trim_start_matches('v').to_string();
 
     if let Some((ver, path)) = local {

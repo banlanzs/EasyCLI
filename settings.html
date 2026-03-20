@@ -38,6 +38,12 @@
             <button class="tab" data-tab="openai" data-i18n="settings.tab.openai">OpenAI Compatibility</button>
         </div>
 
+        <!-- Language Switcher -->
+        <div class="lang-switcher-container">
+            <button class="lang-btn" id="lang-btn-zh" onclick="i18n.setLang('zh')">中文</button>
+            <button class="lang-btn" id="lang-btn-en" onclick="i18n.setLang('en')">EN</button>
+        </div>
+
         <!-- Server Status Display -->
         <div class="server-status-container">
             <div class="server-status-content">
@@ -73,6 +79,29 @@
                                 <input type="checkbox" id="allow-remote-switch" class="switch-input">
                                 <span class="switch-slider"></span>
                             </label>
+                        </div>
+                    </div>
+
+                    <div class="setting-item local-only" id="auto-update-setting">
+                        <div class="setting-label">
+                            <label for="auto-update-switch" data-i18n="settings.basic.auto-update.label">Auto Update CLIProxyAPI</label>
+                            <span class="setting-description" data-i18n="settings.basic.auto-update.desc">Automatically check and download CLIProxyAPI updates on connect</span>
+                        </div>
+                        <div class="setting-control">
+                            <label class="switch">
+                                <input type="checkbox" id="auto-update-switch" class="switch-input">
+                                <span class="switch-slider"></span>
+                            </label>
+                        </div>
+                    </div>
+
+                    <div class="setting-item local-only" id="check-update-setting">
+                        <div class="setting-label">
+                            <label data-i18n="settings.update.check-btn">Check for Updates</label>
+                            <span class="setting-description" id="update-status-text"></span>
+                        </div>
+                        <div class="setting-control">
+                            <button class="form-btn" id="check-update-btn" data-i18n="settings.update.check-btn">Check for Updates</button>
                         </div>
                     </div>
 
@@ -484,6 +513,7 @@
     <script src="js/settings-auth-antigravity.js"></script>
     <script src="js/settings-tabs.js"></script>
     <script src="js/settings-ipc.js"></script>
+    <script src="js/settings-update.js"></script>
     <script src="js/settings-init.js"></script>
     <script src="js/settings.js"></script>
 </body>

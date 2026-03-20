@@ -13,6 +13,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         toggleLocalOnlyFields();
         updateServerStatus();
         updateActionButtons();
+        initializeAutoUpdateSwitch();
 
         const currentTabEl = document.querySelector('.tab.active');
         const currentTab = currentTabEl ? currentTabEl.getAttribute('data-tab') : 'basic';

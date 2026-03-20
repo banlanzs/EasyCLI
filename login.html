@@ -41,6 +41,10 @@
 </head>
 
 <body>
+    <div class="login-lang-switcher">
+        <button class="lang-btn" id="lang-btn-zh" onclick="i18n.setLang('zh')">中文</button>
+        <button class="lang-btn" id="lang-btn-en" onclick="i18n.setLang('en')">EN</button>
+    </div>
 
     <div class="cards-container">
         <div class="card selected" id="local-card">
@@ -72,6 +76,13 @@
     </div>
 
     <button class="continue-btn" id="continue-btn" onclick="window.__onConnect && window.__onConnect()" data-i18n="login.connect.btn">Connect</button>
+
+    <div class="auto-update-row">
+        <label class="auto-update-label">
+            <input type="checkbox" id="auto-update-checkbox" checked>
+            <span data-i18n="settings.basic.auto-update.label">Auto Update CLIProxyAPI</span>
+        </label>
+    </div>
 
     <div class="progress-container" id="progress-container">
         <div class="progress-label" id="progress-label" data-i18n="login.progress.downloading">Downloading CLIProxyAPI...</div>

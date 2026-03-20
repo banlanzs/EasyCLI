@@ -95,6 +95,36 @@ async function openSettingsWindowPreferNew() {
     // Fallback only if Tauri unavailable
     window.location.href = 'settings.html';
 }
+
+// Poll the local CLIProxyAPI management endpoint until it responds (or timeout)
+async function waitForCLIProxyAPI(password, maxWaitMs = 15000, intervalMs = 300) {
+    const config = await (async () => {
+        try {
+            if (window.__TAURI__?.core?.invoke) {
+                return await window.__TAURI__.core.invoke('read_config_yaml');
+            }
+        } catch (_) {}
+        return {};
+    })();
+    const port = (config && config.port) || 8317;
+    const url = `http://127.0.0.1:${port}/v0/management/config`;
+    const deadline = Date.now() + maxWaitMs;
+    while (Date.now() < deadline) {
+        try {
+            const res = await fetch(url, {
+                method: 'GET',
+                headers: { 'X-Management-Key': password },
+                signal: AbortSignal.timeout(1000)
+            });
+            if (res.ok || res.status === 401) {
+                // Server is up (401 means it's running but auth differs — still ready)
+                return true;
+            }
+        } catch (_) {}
+        await new Promise(r => setTimeout(r, intervalMs));
+    }
+    return false; // timed out, open anyway
+}
 updateCancelBtn.addEventListener('click', async () => {
     updateDialog.classList.remove('show');
     // User chose not to update, still run local
@@ -121,6 +151,7 @@ updateCancelBtn.addEventListener('click', async () => {
             showError('CLIProxyAPI process start error');
             return;
         }
+        await waitForCLIProxyAPI(startRes && startRes.password ? startRes.password : '');
         await openSettingsWindowPreferNew();
     }
 });
@@ -175,7 +206,8 @@ updateConfirmBtn.addEventListener('click', async () => {
                         showError('CLIProxyAPI process start error');
                         return;
                     }
-                    setTimeout(async () => { await openSettingsWindowPreferNew(); }, 800);
+                    await waitForCLIProxyAPI(startRes && startRes.password ? startRes.password : '');
+                    await openSettingsWindowPreferNew();
                 }
             } else {
                 showError('Failed to update CLIProxyAPI: ' + result.error);
@@ -183,7 +215,7 @@ updateConfirmBtn.addEventListener('click', async () => {
         }
     } catch (error) {
         console.error('Error updating CLIProxyAPI:', error);
-        showError('Error updating CLIProxyAPI: ' + error.message);
+        showError('Error updating CLIProxyAPI: ' + getErrorMessage(error));
     } finally {
         continueBtn.disabled = false;
         continueBtn.textContent = 'Connect';
@@ -261,23 +293,15 @@ passwordSaveBtn.addEventListener('click', async () => {
                     showError('CLIProxyAPI process start error');
                     return;
                 }
-                setTimeout(async () => { await openSettingsWindowPreferNew(); }, 600);
+                await waitForCLIProxyAPI(startRes && startRes.password ? startRes.password : '');
+                await openSettingsWindowPreferNew();
             } else {
                 showError('Failed to set password: ' + result.error);
             }
         }
     } catch (error) {
         console.error('Error setting password:', error);
-        // Handle different error types
-        let errorMessage = 'Unknown error';
-        if (error && typeof error === 'string') {
-            errorMessage = error;
-        } else if (error && error.message) {
-            errorMessage = error.message;
-        } else if (error && error.toString) {
-            errorMessage = error.toString();
-        }
-        showError('Error setting password: ' + errorMessage);
+        showError('Error setting password: ' + getErrorMessage(error));
     } finally {
         // Restore save button
         passwordSaveBtn.disabled = false;
@@ -332,6 +356,34 @@ function initializeFromLocalStorage() {
     }
 }
 
+const AUTO_UPDATE_KEY = 'easycli-auto-update';
+
+// Sync checkbox with localStorage on load
+document.addEventListener('DOMContentLoaded', () => {
+    const cb = document.getElementById('auto-update-checkbox');
+    if (cb) {
+        const saved = localStorage.getItem(AUTO_UPDATE_KEY);
+        cb.checked = saved === null ? true : saved === 'true';
+        cb.addEventListener('change', () => {
+            localStorage.setItem(AUTO_UPDATE_KEY, cb.checked ? 'true' : 'false');
+        });
+    }
+});
+
+function isAutoUpdateEnabled() {
+    const saved = localStorage.getItem(AUTO_UPDATE_KEY);
+    return saved === null ? true : saved === 'true';
+}
+
+// Extract a readable message from any thrown value (Tauri rejects with plain strings)
+function getErrorMessage(error) {
+    if (!error) return 'Unknown error';
+    if (typeof error === 'string') return error;
+    if (error.message) return error.message;
+    if (error.toString) return error.toString();
+    return 'Unknown error';
+}
+
 async function handleConnectClick() {
     try { showSuccess('Connecting...'); } catch (_) { }
     const localSelected = localCard.classList.contains('selected');
@@ -364,6 +416,34 @@ async function handleConnectClick() {
 
             // Check version and download if needed
             if (window.__TAURI__?.core?.invoke) {
+                if (!isAutoUpdateEnabled()) {
+                    // Auto-update disabled: skip version check, go straight to start
+                    const secretKeyResult = await window.__TAURI__.core.invoke('check_secret_key');
+                    if (secretKeyResult.needsPassword) {
+                        passwordDialog.classList.add('show');
+                    } else {
+                        try {
+                            const startRes = await window.__TAURI__.core.invoke('start_cliproxyapi');
+                            if (!startRes || !startRes.success) {
+                                showError('CLIProxyAPI process start failed');
+                                return;
+                            }
+                            if (startRes.password) {
+                                localStorage.setItem('local-management-key', startRes.password);
+                            }
+                            if (window.configManager) {
+                                window.configManager.startKeepAlive().catch(() => {});
+                            }
+                        } catch (e) {
+                            showError('CLIProxyAPI process start error');
+                            return;
+                        }
+                        await waitForCLIProxyAPI(localStorage.getItem('local-management-key') || '');
+                        await openSettingsWindowPreferNew();
+                    }
+                    return;
+                }
+
                 const result = await window.__TAURI__.core.invoke('check_version_and_download', { proxyUrl });
 
                 if (result.success) {
@@ -412,6 +492,7 @@ async function handleConnectClick() {
                                 showError('CLIProxyAPI process start error');
                                 return;
                             }
+                            await waitForCLIProxyAPI(localStorage.getItem('local-management-key') || '');
                             await openSettingsWindowPreferNew();
                         }
                     }
@@ -424,7 +505,7 @@ async function handleConnectClick() {
             }
         } catch (error) {
             console.error('Error checking version:', error);
-            showError('Error checking version: ' + error.message);
+            showError('Error checking version: ' + getErrorMessage(error));
         } finally {
             // Re-enable button
             continueBtn.disabled = false;
