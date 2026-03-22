@@ -495,6 +495,8 @@ async fn download_cliproxyapi(
 
     // Download with progress
     let client = parse_proxy(&proxy, reqwest::Client::builder())
+        .timeout(Duration::from_secs(300))
+        .connect_timeout(Duration::from_secs(30))
         .build()
         .map_err(|e| e.to_string())?;
     let resp = client

@@ -99,6 +99,9 @@
                         <div class="setting-label">
                             <label data-i18n="settings.update.check-btn">Check for Updates</label>
                             <span class="setting-description" id="update-status-text"></span>
+                            <div id="update-progress-bar" style="display:none;margin-top:6px;height:4px;border-radius:2px;background:#e5e7eb;overflow:hidden;">
+                                <div id="update-progress-fill" style="height:100%;width:0%;background:#6366f1;transition:width 0.3s ease;"></div>
+                            </div>
                         </div>
                         <div class="setting-control">
                             <button class="form-btn" id="check-update-btn" data-i18n="settings.update.check-btn">Check for Updates</button>
