@@ -358,14 +358,19 @@ fn parse_proxy_url(proxy_url: &str) -> Result<ProxyConfig, String> {
 }
 
 async fn fetch_latest_release(proxy_url: String) -> Result<VersionInfo, AppError> {
-    let client = parse_proxy(&proxy_url, reqwest::Client::builder())
-        .user_agent("EasyCLI")
-        .timeout(Duration::from_secs(15))
-        .build()?;
+    let client_builder = reqwest::Client::builder()
+        .user_agent("EasyCLI-Updater/1.0")
+        .timeout(Duration::from_secs(30)) // Increased from 15s for slower connections
+        .connect_timeout(Duration::from_secs(15));
+
+    let client = parse_proxy(&proxy_url, client_builder)
+        .build()
+        .map_err(|e| AppError::Other(format!("Failed to create HTTP client: {}", e)))?;
 
     let mut last_err = None;
     for attempt in 0..3 {
         if attempt > 0 {
+            println!("[FETCH] Retry attempt {}/3 after 2s delay", attempt + 1);
             sleep(Duration::from_secs(2)).await;
         }
         match client
@@ -376,12 +381,34 @@ async fn fetch_latest_release(proxy_url: String) -> Result<VersionInfo, AppError
         {
             Ok(resp) => match resp.error_for_status() {
                 Ok(r) => return Ok(r.json::<VersionInfo>().await?),
-                Err(e) => last_err = Some(AppError::Http(e)),
+                Err(e) => {
+                    last_err = Some(AppError::Http(e));
+                    println!("[FETCH] HTTP error: {:?}", last_err);
+                }
             },
-            Err(e) => last_err = Some(AppError::Http(e)),
+            Err(e) => {
+                last_err = Some(AppError::Http(e));
+                println!("[FETCH] Connection error: {:?}", last_err);
+            }
         }
     }
-    Err(last_err.unwrap_or_else(|| AppError::Other("Failed to fetch release info".into())))
+    let err_msg = if !proxy_url.is_empty() {
+        format!(
+            "Failed to fetch latest release info after 3 attempts.\n\
+             Proxy: {}\n\
+             Error: {:?}\n\
+             Please check your proxy settings and try again.",
+            proxy_url, last_err
+        )
+    } else {
+        format!(
+            "Failed to fetch latest release info after 3 attempts.\n\
+             Error: {:?}\n\
+             Please check your network connection and try again.",
+            last_err
+        )
+    };
+    Err(last_err.unwrap_or_else(|| AppError::Other(err_msg)))
 }
 
 #[tauri::command]
@@ -494,16 +521,38 @@ async fn download_cliproxyapi(
         .ok();
 
     // Download with progress
-    let client = parse_proxy(&proxy, reqwest::Client::builder())
-        .timeout(Duration::from_secs(300))
-        .connect_timeout(Duration::from_secs(30))
+    // Build client with proper configuration for GitHub downloads
+    let client_builder = reqwest::Client::builder()
+        .timeout(Duration::from_secs(600)) // 10 minutes total timeout for large files
+        .connect_timeout(Duration::from_secs(60)) // 60 seconds to establish connection
+        .user_agent("EasyCLI-Updater/1.0") // GitHub requires User-Agent
+        .tcp_keepalive(Duration::from_secs(30)) // Keep connection alive during slow downloads
+        .danger_accept_invalid_certs(false); // Secure by default
+
+    let client = parse_proxy(&proxy, client_builder)
         .build()
-        .map_err(|e| e.to_string())?;
+        .map_err(|e| format!("Failed to create HTTP client: {}", e))?;
+
+    println!("[DOWNLOAD] Starting download from: {}", asset.browser_download_url);
+    println!("[DOWNLOAD] Proxy: {}", if proxy.is_empty() { "none" } else { &proxy });
+
     let resp = client
         .get(&asset.browser_download_url)
         .send()
         .await
-        .map_err(|e| e.to_string())?;
+        .map_err(|e| {
+            let error_msg = format!(
+                "Failed to connect to GitHub. Error: {}\n\
+                 URL: {}\n\
+                 Proxy: {}\n\
+                 Please check your network connection and proxy settings.",
+                e,
+                asset.browser_download_url,
+                if proxy.is_empty() { "none".to_string() } else { proxy.clone() }
+            );
+            println!("[DOWNLOAD ERROR] {}", error_msg);
+            error_msg
+        })?;
     if !resp.status().is_success() {
         return Err(format!("Download failed, status: {}", resp.status()));
     }
