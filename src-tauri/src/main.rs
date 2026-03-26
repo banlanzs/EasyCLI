@@ -831,7 +831,7 @@ fn read_local_auth_files() -> Result<serde_json::Value, String> {
                         .modified()
                         .ok()
                         .and_then(|m| m.duration_since(std::time::UNIX_EPOCH).ok())
-                        .map(|d| (d.as_millis() as u64))
+                        .map(|d| d.as_millis() as u64)
                         .unwrap_or(0);
                     result.push(json!({
                         "name": name,
@@ -974,6 +974,67 @@ fn generate_random_password() -> String {
         .collect()
 }
 
+fn ensure_local_management_secret(conf: &mut serde_yaml::Value) -> Result<String, String> {
+    let mapping = conf
+        .as_mapping_mut()
+        .ok_or("Invalid config structure")?;
+    let remote_management_key = serde_yaml::Value::from("remote-management");
+    let secret_key = serde_yaml::Value::from("secret-key");
+
+    let remote_management = mapping
+        .entry(remote_management_key)
+        .or_insert_with(|| serde_yaml::Value::Mapping(Default::default()));
+
+    if !remote_management.is_mapping() {
+        *remote_management = serde_yaml::Value::Mapping(Default::default());
+    }
+
+    let remote_management_map = remote_management
+        .as_mapping_mut()
+        .ok_or("Invalid remote-management config structure")?;
+
+    if let Some(existing) = remote_management_map.get(&secret_key).and_then(|v| v.as_str()) {
+        let trimmed = existing.trim();
+        if !trimmed.is_empty() {
+            return Ok(trimmed.to_string());
+        }
+    }
+
+    let generated = generate_random_password();
+    remote_management_map.insert(secret_key, serde_yaml::Value::from(generated.as_str()));
+    Ok(generated)
+}
+
+fn read_config_yaml_value() -> Result<serde_yaml::Value, String> {
+    let dir = app_dir().map_err(|e| e.to_string())?;
+    let path = dir.join("config.yaml");
+    if !path.exists() {
+        return Err("Configuration file does not exist".into());
+    }
+    let content = fs::read_to_string(&path).map_err(|e| e.to_string())?;
+    serde_yaml::from_str(&content).map_err(|e| e.to_string())
+}
+
+fn write_config_yaml_value(conf: &serde_yaml::Value) -> Result<(), String> {
+    let dir = app_dir().map_err(|e| e.to_string())?;
+    let path = dir.join("config.yaml");
+    let updated_content = serde_yaml::to_string(conf).map_err(|e| e.to_string())?;
+    fs::write(&path, updated_content).map_err(|e| e.to_string())
+}
+
+fn read_local_management_secret_from_config(conf: &serde_yaml::Value) -> Option<String> {
+    conf.get("remote-management")
+        .and_then(|v| v.as_mapping())
+        .and_then(|map| map.get(&serde_yaml::Value::from("secret-key")))
+        .and_then(|v| v.as_str())
+        .map(|v| v.trim().to_string())
+        .filter(|v| !v.is_empty())
+}
+
+fn cache_local_management_secret(password: Option<&str>) {
+    *CLI_PROXY_PASSWORD.lock() = password.map(|value| value.to_string());
+}
+
 // Kill any process using the specified port
 fn kill_process_on_port(port: u16) -> Result<(), String> {
     println!("[PORT_CLEANUP] Checking port {}", port);
@@ -1058,6 +1119,15 @@ fn kill_process_on_port(port: u16) -> Result<(), String> {
 
 #[tauri::command]
 fn start_cliproxyapi(app: tauri::AppHandle) -> Result<serde_json::Value, String> {
+    let config = app_dir().map_err(|e| e.to_string())?.join("config.yaml");
+    let persisted_password = if config.exists() {
+        read_config_yaml_value()
+            .ok()
+            .and_then(|conf| read_local_management_secret_from_config(&conf))
+    } else {
+        None
+    };
+
     // Check if already running by testing PID
     if let Some(pid) = *PROCESS_PID.lock() {
         #[cfg(target_os = "windows")]
@@ -1067,7 +1137,8 @@ fn start_cliproxyapi(app: tauri::AppHandle) -> Result<serde_json::Value, String>
                 .output();
             if let Ok(output) = output {
                 if String::from_utf8_lossy(&output.stdout).contains(&pid.to_string()) {
-                    return Ok(json!({"success": true, "message": "already running"}));
+                    cache_local_management_secret(persisted_password.as_deref());
+                    return Ok(json!({"success": true, "message": "already running", "password": persisted_password}));
                 }
             }
         }
@@ -1075,7 +1146,8 @@ fn start_cliproxyapi(app: tauri::AppHandle) -> Result<serde_json::Value, String>
         {
             unsafe {
                 if libc::kill(pid as i32, 0) == 0 {
-                    return Ok(json!({"success": true, "message": "already running"}));
+                    cache_local_management_secret(persisted_password.as_deref());
+                    return Ok(json!({"success": true, "message": "already running", "password": persisted_password}));
                 }
             }
         }
@@ -1084,7 +1156,6 @@ fn start_cliproxyapi(app: tauri::AppHandle) -> Result<serde_json::Value, String>
     let info = current_local_info().map_err(|e| e.to_string())?;
     let (_ver, path) = info.ok_or("Version file does not exist")?;
     let exec = find_executable(&path).ok_or("Executable file does not exist")?;
-    let config = app_dir().map_err(|e| e.to_string())?.join("config.yaml");
     if !config.exists() {
         return Err("Configuration file does not exist".into());
     }
@@ -1100,40 +1171,14 @@ fn start_cliproxyapi(app: tauri::AppHandle) -> Result<serde_json::Value, String>
         eprintln!("[PORT_CLEANUP] Warning: {}", e);
     }
 
-    // Generate random password for local mode
-    let password = generate_random_password();
+    // Reuse persisted secret key, generate only if missing
+    let password = ensure_local_management_secret(&mut conf)?;
 
     // Store the password for keep-alive authentication
-    *CLI_PROXY_PASSWORD.lock() = Some(password.clone());
+    cache_local_management_secret(Some(password.as_str()));
 
-    // Ensure remote-management section exists
-    if !conf
-        .as_mapping()
-        .unwrap()
-        .contains_key(&serde_yaml::Value::from("remote-management"))
-    {
-        conf.as_mapping_mut().unwrap().insert(
-            serde_yaml::Value::from("remote-management"),
-            serde_yaml::Value::Mapping(Default::default()),
-        );
-    }
-
-    // Set the secret-key
-    let rm = conf
-        .as_mapping_mut()
-        .unwrap()
-        .get_mut(&serde_yaml::Value::from("remote-management"))
-        .unwrap()
-        .as_mapping_mut()
-        .unwrap();
-    rm.insert(
-        serde_yaml::Value::from("secret-key"),
-        serde_yaml::Value::from(password.as_str()),
-    );
-
-    // Write updated config
-    let updated_content = serde_yaml::to_string(&conf).map_err(|e| e.to_string())?;
-    fs::write(&config, updated_content).map_err(|e| e.to_string())?;
+    // Persist config so a newly generated secret key is saved for future restarts
+    write_config_yaml_value(&conf)?;
 
     println!("[CLIProxyAPI][START] exec: {}", exec.to_string_lossy());
     println!(
@@ -1166,7 +1211,7 @@ fn start_cliproxyapi(app: tauri::AppHandle) -> Result<serde_json::Value, String>
     cmd.stdin(Stdio::null())
         .stdout(Stdio::null())
         .stderr(Stdio::null());
-    let mut child = cmd.spawn().map_err(|e| {
+    let child = cmd.spawn().map_err(|e| {
         eprintln!("[CLIProxyAPI][ERROR] failed to start process: {}", e);
         e.to_string()
     })?;
@@ -1230,40 +1275,14 @@ fn restart_cliproxyapi(app: tauri::AppHandle) -> Result<(), String> {
         eprintln!("[PORT_CLEANUP] Warning: {}", e);
     }
 
-    // Generate random password for local mode
-    let password = generate_random_password();
+    // Reuse persisted secret key, generate only if missing
+    let password = ensure_local_management_secret(&mut conf)?;
 
     // Store the password for keep-alive authentication
     *CLI_PROXY_PASSWORD.lock() = Some(password.clone());
 
-    // Ensure remote-management section exists
-    if !conf
-        .as_mapping()
-        .unwrap()
-        .contains_key(&serde_yaml::Value::from("remote-management"))
-    {
-        conf.as_mapping_mut().unwrap().insert(
-            serde_yaml::Value::from("remote-management"),
-            serde_yaml::Value::Mapping(Default::default()),
-        );
-    }
-
-    // Set the secret-key
-    let rm = conf
-        .as_mapping_mut()
-        .unwrap()
-        .get_mut(&serde_yaml::Value::from("remote-management"))
-        .unwrap()
-        .as_mapping_mut()
-        .unwrap();
-    rm.insert(
-        serde_yaml::Value::from("secret-key"),
-        serde_yaml::Value::from(password.as_str()),
-    );
-
-    // Write updated config
-    let updated_content = serde_yaml::to_string(&conf).map_err(|e| e.to_string())?;
-    fs::write(&config, updated_content).map_err(|e| e.to_string())?;
+    // Persist config so a newly generated secret key is saved for future restarts
+    write_config_yaml_value(&conf)?;
 
     println!("[CLIProxyAPI][RESTART] exec: {}", exec.to_string_lossy());
     println!(
@@ -1296,7 +1315,7 @@ fn restart_cliproxyapi(app: tauri::AppHandle) -> Result<(), String> {
     cmd.stdin(Stdio::null())
         .stdout(Stdio::null())
         .stderr(Stdio::null());
-    let mut child = cmd.spawn().map_err(|e| {
+    let child = cmd.spawn().map_err(|e| {
         eprintln!("[CLIProxyAPI][ERROR] failed to restart process: {}", e);
         e.to_string()
     })?;
@@ -1328,9 +1347,10 @@ fn create_tray(app: &tauri::AppHandle) -> tauri::Result<()> {
     }
 
     let open_settings = MenuItemBuilder::with_id("open_settings", "打开设置").build(app)?;
+    let restart_service = MenuItemBuilder::with_id("restart_service", "重启服务").build(app)?;
     let quit = MenuItemBuilder::with_id("quit", "退出").build(app)?;
     let menu = MenuBuilder::new(app)
-        .items(&[&open_settings, &quit])
+        .items(&[&open_settings, &restart_service, &quit])
         .build()?;
     let mut builder = TrayIconBuilder::new()
         .menu(&menu)
@@ -1339,6 +1359,11 @@ fn create_tray(app: &tauri::AppHandle) -> tauri::Result<()> {
         .on_menu_event(|app, event| match event.id().as_ref() {
             "open_settings" => {
                 let _ = open_settings_window(app.clone());
+            }
+            "restart_service" => {
+                if let Err(error) = restart_cliproxyapi(app.clone()) {
+                    eprintln!("[CLIProxyAPI][RESTART] Tray restart failed: {}", error);
+                }
             }
             "quit" => {
                 // Just exit app - CLIProxyAPI continues running
@@ -2017,11 +2042,16 @@ fn start_keep_alive(port: u16) -> Result<serde_json::Value, String> {
     // Stop existing keep-alive if running
     stop_keep_alive_internal();
 
-    // Get the stored password
-    let password = CLI_PROXY_PASSWORD
-        .lock()
-        .clone()
-        .ok_or("No CLIProxyAPI password available")?;
+    // Get the stored password, fall back to persisted config if needed
+    let password = if let Some(password) = CLI_PROXY_PASSWORD.lock().clone() {
+        password
+    } else {
+        let conf = read_config_yaml_value()?;
+        let password = read_local_management_secret_from_config(&conf)
+            .ok_or("No CLIProxyAPI password available")?;
+        *CLI_PROXY_PASSWORD.lock() = Some(password.clone());
+        password
+    };
 
     let stop = Arc::new(AtomicBool::new(false));
     let stop_clone = stop.clone();

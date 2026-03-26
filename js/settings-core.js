@@ -12,6 +12,7 @@ const secretKeyInput = document.getElementById('secret-key-input');
 const switchProjectSwitch = document.getElementById('switch-project-switch');
 const switchPreviewModelSwitch = document.getElementById('switch-preview-model-switch');
 const autoStartSwitch = document.getElementById('auto-start-switch');
+const restartServiceBtn = document.getElementById('restart-service-btn');
 
 // Action buttons
 const applyBtn = document.getElementById('apply-btn');
@@ -211,6 +212,7 @@ async function applyAllSettings() {
         const serverConfig = await getCurrentConfig();
         const currentTab = document.querySelector('.tab.active').getAttribute('data-tab');
         const changes = [];
+        let secretKeyChanged = false;
 
         if (currentTab === 'basic') {
             if (debugSwitch.checked !== (serverConfig.debug || false)) {
@@ -252,6 +254,7 @@ async function applyAllSettings() {
 
                 if (secretKeyInput.value.trim() !== '') {
                     changes.push({ endpoint: 'remote-management.secret-key', value: secretKeyInput.value });
+                    secretKeyChanged = true;
                 }
             }
 
@@ -331,8 +334,8 @@ async function applyAllSettings() {
             const tabName = i18n.t(`tab.${currentTab}`);
             showSuccessMessage(`${i18n.t('msg.applied')} ${successCount} ${tabName.toLowerCase()} ${i18n.t('msg.settings')}`);
 
-            if (portChanged && localStorage.getItem('type') === 'local') {
-                console.log('Port configuration has changed, need to restart CLIProxyAPI process');
+            if ((portChanged || secretKeyChanged) && localStorage.getItem('type') === 'local') {
+                console.log('Configuration requires CLIProxyAPI restart');
                 showSuccessMessage(i18n.t('msg.port-restart'));
                 if (window.__TAURI__?.core?.invoke) {
                     window.__TAURI__.core.invoke('restart_cliproxyapi');
@@ -412,6 +415,34 @@ async function resetAllSettings() {
     }
 }
 
+async function restartLocalService() {
+    if (!restartServiceBtn || restartServiceBtn.disabled) {
+        return;
+    }
+
+    if (!window.__TAURI__?.core?.invoke) {
+        showError(i18n.t('msg.network-error'));
+        return;
+    }
+
+    const originalText = restartServiceBtn.textContent;
+    restartServiceBtn.disabled = true;
+    restartServiceBtn.textContent = i18n.t('settings.basic.restart-service.restarting');
+
+    try {
+        await window.__TAURI__.core.invoke('restart_cliproxyapi');
+    } catch (error) {
+        console.error('Error restarting CLIProxyAPI:', error);
+        showError(i18n.t('settings.basic.restart-service.failed'));
+    } finally {
+        restartServiceBtn.disabled = false;
+        restartServiceBtn.textContent = originalText || i18n.t('settings.basic.restart-service.btn');
+    }
+}
+
 // Wire core button events
 applyBtn.addEventListener('click', applyAllSettings);
 resetBtn.addEventListener('click', resetAllSettings);
+if (restartServiceBtn) {
+    restartServiceBtn.addEventListener('click', restartLocalService);
+}
