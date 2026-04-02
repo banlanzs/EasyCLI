@@ -48,4 +48,16 @@ if (window.__TAURI__?.event?.listen) {
         }
         showSuccessMessage(i18n.t('msg.restarted'));
     });
+
+    window.__TAURI__.event.listen('cliproxyapi-auto-restarted', async (event) => {
+        const data = event?.payload || {};
+        console.log('CLIProxyAPI process auto-restarted:', data);
+        if (typeof loadRuntimeHealthSummary === 'function') {
+            try {
+                await loadRuntimeHealthSummary();
+            } catch (error) {
+                console.error('Error refreshing runtime health summary:', error);
+            }
+        }
+    });
 }

@@ -118,6 +118,18 @@
                         </div>
                     </div>
 
+                    <div class="setting-item local-only stacked-setting" id="runtime-log-setting">
+                        <div class="setting-label">
+                            <label data-i18n="settings.basic.runtime-health.label">Runtime Health</label>
+                            <div class="setting-description runtime-health-summary" id="runtime-health-summary" data-i18n="settings.basic.runtime-health.loading">Loading runtime health summary...</div>
+                            <span class="setting-description" data-i18n="settings.basic.runtime-log.desc">Open or export the EasyCLI runtime logs for diagnostics</span>
+                        </div>
+                        <div class="setting-control button-group">
+                            <button class="form-btn" id="open-runtime-log-btn" data-i18n="settings.basic.runtime-log.btn">Open Log Folder</button>
+                            <button class="form-btn" id="export-runtime-log-btn" data-i18n="settings.basic.runtime-log.export-btn">Export Logs ZIP</button>
+                        </div>
+                    </div>
+
                     <div class="setting-item local-only" id="auto-start-setting">
                         <div class="setting-label">
                             <label for="auto-start-switch" data-i18n="settings.basic.auto-start.label">Start at Login</label>

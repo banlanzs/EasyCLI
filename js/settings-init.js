@@ -10,6 +10,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         await initializeRemoteManagement();
         await initializeAdditionalSettings();
         await initializeAutoStart();
+        await loadRuntimeHealthSummary();
         toggleLocalOnlyFields();
         updateServerStatus();
         updateActionButtons();

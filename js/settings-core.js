@@ -13,6 +13,9 @@ const switchProjectSwitch = document.getElementById('switch-project-switch');
 const switchPreviewModelSwitch = document.getElementById('switch-preview-model-switch');
 const autoStartSwitch = document.getElementById('auto-start-switch');
 const restartServiceBtn = document.getElementById('restart-service-btn');
+const openRuntimeLogBtn = document.getElementById('open-runtime-log-btn');
+const exportRuntimeLogBtn = document.getElementById('export-runtime-log-btn');
+const runtimeHealthSummaryText = document.getElementById('runtime-health-summary');
 
 // Action buttons
 const applyBtn = document.getElementById('apply-btn');
@@ -440,9 +443,114 @@ async function restartLocalService() {
     }
 }
 
+async function openRuntimeLogDirectory() {
+    if (!openRuntimeLogBtn || openRuntimeLogBtn.disabled) {
+        return;
+    }
+
+    if (!window.__TAURI__?.core?.invoke) {
+        showError(i18n.t('msg.network-error'));
+        return;
+    }
+
+    const originalText = openRuntimeLogBtn.textContent;
+    openRuntimeLogBtn.disabled = true;
+    openRuntimeLogBtn.textContent = i18n.t('settings.basic.runtime-log.opening');
+
+    try {
+        await window.__TAURI__.core.invoke('open_runtime_log_directory');
+    } catch (error) {
+        console.error('Error opening runtime log directory:', error);
+        showError(i18n.t('settings.basic.runtime-log.failed'));
+    } finally {
+        openRuntimeLogBtn.disabled = false;
+        openRuntimeLogBtn.textContent = originalText || i18n.t('settings.basic.runtime-log.btn');
+    }
+}
+
+function formatRuntimeHealthSummary(summary) {
+    if (!summary || !summary.lastAutoRestartAt) {
+        return i18n.t('settings.basic.runtime-health.empty');
+    }
+
+    const reasonKey = `settings.basic.runtime-health.reason.${summary.lastAutoRestartReason || 'unknown'}`;
+    const reason = i18n.t(reasonKey);
+    const resultKey = `settings.basic.runtime-health.result.${summary.lastAutoRestartResult || 'unknown'}`;
+    const result = i18n.t(resultKey);
+    const port = summary.lastAutoRestartPort ? `:${summary.lastAutoRestartPort}` : i18n.t('settings.server.unknown');
+    const failures = summary.lastAutoRestartTriggerFailures || 0;
+    const details = summary.lastAutoRestartDetails || i18n.t('settings.basic.runtime-health.no-details');
+    const retained = `${summary.availableLogFiles || 0}/${summary.retentionDays || 14}`;
+
+    return [
+        `${i18n.t('settings.basic.runtime-health.last-at')} ${summary.lastAutoRestartAt}`,
+        `${i18n.t('settings.basic.runtime-health.reason-label')} ${reason}`,
+        `${i18n.t('settings.basic.runtime-health.result-label')} ${result}`,
+        `${i18n.t('settings.basic.runtime-health.port-label')} ${port}`,
+        `${i18n.t('settings.basic.runtime-health.failures-label')} ${failures}`,
+        `${i18n.t('settings.basic.runtime-health.retained-label')} ${retained}`,
+        `${i18n.t('settings.basic.runtime-health.details-label')} ${details}`
+    ].join('\n');
+}
+
+async function loadRuntimeHealthSummary() {
+    if (!runtimeHealthSummaryText) {
+        return;
+    }
+
+    runtimeHealthSummaryText.textContent = i18n.t('settings.basic.runtime-health.loading');
+
+    if (!window.__TAURI__?.core?.invoke) {
+        runtimeHealthSummaryText.textContent = i18n.t('settings.basic.runtime-health.unavailable');
+        return;
+    }
+
+    try {
+        const summary = await window.__TAURI__.core.invoke('read_runtime_health_summary');
+        runtimeHealthSummaryText.textContent = formatRuntimeHealthSummary(summary || {});
+    } catch (error) {
+        console.error('Error loading runtime health summary:', error);
+        runtimeHealthSummaryText.textContent = i18n.t('settings.basic.runtime-health.failed');
+    }
+}
+
+async function exportRuntimeLogsZip() {
+    if (!exportRuntimeLogBtn || exportRuntimeLogBtn.disabled) {
+        return;
+    }
+
+    if (!window.__TAURI__?.core?.invoke) {
+        showError(i18n.t('msg.network-error'));
+        return;
+    }
+
+    const originalText = exportRuntimeLogBtn.textContent;
+    exportRuntimeLogBtn.disabled = true;
+    exportRuntimeLogBtn.textContent = i18n.t('settings.basic.runtime-log.exporting');
+
+    try {
+        const result = await window.__TAURI__.core.invoke('export_runtime_logs_zip');
+        if (result?.success) {
+            showSuccessMessage(i18n.t('settings.basic.runtime-log.exported'));
+        }
+    } catch (error) {
+        console.error('Error exporting runtime logs ZIP:', error);
+        showError(i18n.t('settings.basic.runtime-log.export-failed'));
+    } finally {
+        exportRuntimeLogBtn.disabled = false;
+        exportRuntimeLogBtn.textContent = originalText || i18n.t('settings.basic.runtime-log.export-btn');
+    }
+}
+
 // Wire core button events
 applyBtn.addEventListener('click', applyAllSettings);
 resetBtn.addEventListener('click', resetAllSettings);
 if (restartServiceBtn) {
     restartServiceBtn.addEventListener('click', restartLocalService);
+}
+if (openRuntimeLogBtn) {
+    openRuntimeLogBtn.addEventListener('click', openRuntimeLogDirectory);
+}
+if (exportRuntimeLogBtn) {
+    exportRuntimeLogBtn.addEventListener('click', exportRuntimeLogsZip);
 }
