@@ -1136,7 +1136,7 @@ fn runtime_log_date_and_timestamp() -> (String, String) {
             target_os = "linux",
             target_os = "macos"
         ))]
-        tm_zone: std::ptr::null(),
+        tm_zone: std::ptr::null_mut(),
     };
 
     unsafe {
