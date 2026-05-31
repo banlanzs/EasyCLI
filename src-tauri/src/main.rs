@@ -392,7 +392,7 @@ async fn fetch_latest_release(proxy_url: String) -> Result<VersionInfo, AppError
             sleep(Duration::from_secs(2)).await;
         }
         match client
-            .get("https://api.github.com/repos/luispater/CLIProxyAPI/releases/latest")
+            .get("https://api.github.com/repos/router-for-me/CLIProxyAPI/releases/latest")
             .header("Accept", "application/vnd.github.v3+json")
             .send()
             .await
@@ -2320,7 +2320,7 @@ fn main() {
                 );
             }
         })
-        // Note: Tauri v2 has no Builder::on_exit; we rely on tray Quit and OS termination to close child.
+        // Handle application exit request to prevent exit when tray is present
         .invoke_handler(tauri::generate_handler![
             check_version_and_download,
             download_cliproxyapi,
@@ -2348,8 +2348,27 @@ fn main() {
             enable_auto_start,
             disable_auto_start
         ])
-        .run(tauri::generate_context!())
-        .expect("error while running tauri application");
+        .build(tauri::generate_context!())
+        .unwrap()
+        .run(|_app_handle, event| {
+            if let tauri::RunEvent::ExitRequested { api, code, .. } = event {
+                // Only prevent exit if tray icon exists (app is in "running in background" state)
+                if TRAY_ICON.lock().is_some() {
+                    // Log exit attempt for debugging
+                    println!(
+                        "[CLIProxyAPI][INFO] Exit requested (code={:?}) - preventing, app remains in tray",
+                        code
+                    );
+                    api.prevent_exit();
+                } else {
+                    // No tray icon, allow normal exit (cleanup will happen)
+                    println!(
+                        "[CLIProxyAPI][INFO] Exit requested (code={:?}) - allowing exit, no tray icon",
+                        code
+                    );
+                }
+            }
+        });
 }
 
 #[derive(Deserialize)]
