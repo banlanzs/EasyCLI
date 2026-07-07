@@ -1,12 +1,142 @@
 // Manual update check and download for the Settings panel (Basic tab, local-only)
 
 const AUTO_UPDATE_KEY = 'easycli-auto-update';
+const LAST_MIRROR_KEY = 'easycli-last-mirror';
 
 const autoUpdateSwitch = document.getElementById('auto-update-switch');
 const checkUpdateBtn = document.getElementById('check-update-btn');
 const updateStatusText = document.getElementById('update-status-text');
 const updateProgressBar = document.getElementById('update-progress-bar');
 const updateProgressFill = document.getElementById('update-progress-fill');
+
+// GitHub PAT settings — persisted in backend easycli-settings.json, applied to update checks
+const githubTokenSwitch = document.getElementById('github-token-switch');
+const githubTokenInput = document.getElementById('github-token-input');
+
+// Download mirror selection modal — shown after an update is found, before downloading.
+// Mirror is a per-download choice (most mirrors only proxy file downloads, not the API),
+// so it is NOT applied to update checks. Last selection is remembered in localStorage.
+const downloadMirrorModal = document.getElementById('download-mirror-modal');
+const downloadMirrorModalClose = document.getElementById('download-mirror-modal-close');
+const downloadMirrorModalCancel = document.getElementById('download-mirror-modal-cancel');
+const downloadMirrorModalConfirm = document.getElementById('download-mirror-modal-confirm');
+const downloadMirrorCustomInput = document.getElementById('download-mirror-custom-input');
+const downloadMirrorRadios = document.getElementsByName('download-mirror-radio');
+const MIRROR_CUSTOM_RADIO = '__custom__';
+
+// Persist the GitHub PAT setting to the backend.
+async function saveUpdateSettings() {
+    if (!window.__TAURI__?.core?.invoke) return;
+    try {
+        await window.__TAURI__.core.invoke('write_update_settings', {
+            useGithubToken: githubTokenSwitch.checked,
+            githubToken: githubTokenInput.value
+        });
+    } catch (err) {
+        console.error('Failed to save update settings:', err);
+    }
+}
+
+// Load GitHub PAT setting from backend and populate the UI.
+async function loadUpdateSettings() {
+    if (!window.__TAURI__?.core?.invoke) return;
+    try {
+        const s = await window.__TAURI__.core.invoke('read_update_settings');
+        githubTokenSwitch.checked = !!s.useGithubToken;
+        githubTokenInput.value = s.githubToken || '';
+    } catch (err) {
+        console.error('Failed to load update settings:', err);
+    }
+}
+
+// Read the currently selected mirror from the modal.
+// Returns { value, valid }: value is the mirror URL ("" = direct), valid=false if custom selected but empty.
+function readSelectedMirror() {
+    let selected = '';
+    let isCustom = false;
+    for (const r of downloadMirrorRadios) {
+        if (r.checked) {
+            selected = r.value;
+            isCustom = selected === MIRROR_CUSTOM_RADIO;
+            break;
+        }
+    }
+    if (isCustom) {
+        const v = downloadMirrorCustomInput.value.trim();
+        return { value: v, valid: v !== '' };
+    }
+    return { value: selected, valid: true };
+}
+
+// Show/hide the custom mirror input depending on radio selection.
+function syncMirrorModalCustomVisibility() {
+    let isCustom = false;
+    for (const r of downloadMirrorRadios) {
+        if (r.checked) { isCustom = r.value === MIRROR_CUSTOM_RADIO; break; }
+    }
+    downloadMirrorCustomInput.style.display = isCustom ? 'block' : 'none';
+}
+
+// Show the mirror selection dialog. Resolves to:
+//   string mirrorUrl ("" = direct download) on confirm
+//   null on cancel
+function showMirrorSelectDialog() {
+    return new Promise((resolve) => {
+        const radios = Array.from(downloadMirrorRadios);
+        const customRadio = radios.find(r => r.value === MIRROR_CUSTOM_RADIO);
+
+        // Restore last selection (default: direct)
+        const last = localStorage.getItem(LAST_MIRROR_KEY);
+        if (last === null) {
+            radios[0].checked = true;
+        } else {
+            const preset = radios.find(r => r.value === last && r.value !== MIRROR_CUSTOM_RADIO);
+            if (preset) {
+                preset.checked = true;
+            } else if (last === '') {
+                radios[0].checked = true;
+            } else if (customRadio) {
+                customRadio.checked = true;
+                downloadMirrorCustomInput.value = last;
+            }
+        }
+        syncMirrorModalCustomVisibility();
+        downloadMirrorCustomInput.classList.remove('error');
+
+        const cleanup = () => {
+            downloadMirrorModal.classList.remove('show');
+            downloadMirrorModalConfirm.removeEventListener('click', onConfirm);
+            downloadMirrorModalCancel.removeEventListener('click', onCancel);
+            downloadMirrorModalClose.removeEventListener('click', onCancel);
+            for (const r of downloadMirrorRadios) r.removeEventListener('change', onRadioChange);
+        };
+        const onConfirm = () => {
+            const { value, valid } = readSelectedMirror();
+            if (!valid) {
+                downloadMirrorCustomInput.classList.add('error');
+                return; // keep modal open
+            }
+            localStorage.setItem(LAST_MIRROR_KEY, value);
+            cleanup();
+            resolve(value);
+        };
+        const onCancel = () => {
+            cleanup();
+            resolve(null);
+        };
+        const onRadioChange = () => {
+            syncMirrorModalCustomVisibility();
+            downloadMirrorCustomInput.classList.remove('error');
+        };
+
+        downloadMirrorModalConfirm.addEventListener('click', onConfirm);
+        downloadMirrorModalCancel.addEventListener('click', onCancel);
+        downloadMirrorModalClose.addEventListener('click', onCancel);
+        for (const r of downloadMirrorRadios) r.addEventListener('change', onRadioChange);
+
+        downloadMirrorModal.classList.add('show');
+    });
+}
 
 function setDownloadProgress(pct, show) {
     if (show) {
@@ -86,6 +216,16 @@ checkUpdateBtn.addEventListener('click', async () => {
             return;
         }
 
+        // User confirmed update — ask which download source to use (direct or mirror)
+        const mirrorUrl = await showMirrorSelectDialog();
+        if (mirrorUrl === null) {
+            setUpdateStatus(
+                `${i18n.t('settings.update.current-version')} ${current} / ${i18n.t('settings.update.latest-version')} ${latest}`,
+                '#6b7280'
+            );
+            return;
+        }
+
         // User confirmed — download
         checkUpdateBtn.textContent = i18n.t('settings.update.downloading');
         setUpdateStatus(i18n.t('settings.update.downloading'), '#6b7280');
@@ -113,7 +253,7 @@ checkUpdateBtn.addEventListener('click', async () => {
             }
         } catch (_) {}
 
-        const dlResult = await window.__TAURI__.core.invoke('download_cliproxyapi', { proxyUrl });
+        const dlResult = await window.__TAURI__.core.invoke('download_cliproxyapi', { proxyUrl, mirrorUrl });
 
         // Cleanup listeners
         if (unlistenProgress) unlistenProgress();
@@ -145,3 +285,9 @@ checkUpdateBtn.addEventListener('click', async () => {
 
 // Initialize on load
 initializeAutoUpdateSwitch();
+
+// Wire up GitHub PAT setting — save on change
+githubTokenSwitch.addEventListener('change', saveUpdateSettings);
+githubTokenInput.addEventListener('change', saveUpdateSettings);
+
+loadUpdateSettings();

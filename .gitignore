@@ -7,3 +7,4 @@ src-tauri/logs/
 .serena/
 AGENTS.md
 CLAUDE.md
+.claude/

@@ -108,6 +108,20 @@
                         </div>
                     </div>
 
+                    <div class="setting-item local-only stacked-setting" id="github-token-setting">
+                        <div class="setting-label">
+                            <label for="github-token-switch" data-i18n="settings.update.github-token.label">GitHub Personal Access Token</label>
+                            <span class="setting-description" data-i18n="settings.update.github-token.desc">Authenticate update checks with a PAT to bypass anonymous rate limits</span>
+                        </div>
+                        <div class="setting-control" style="flex-direction:column;align-items:stretch;gap:8px;">
+                            <label class="switch" style="align-self:flex-start;">
+                                <input type="checkbox" id="github-token-switch" class="switch-input">
+                                <span class="switch-slider"></span>
+                            </label>
+                            <input type="password" id="github-token-input" class="form-input" data-i18n-placeholder="settings.update.github-token.placeholder" placeholder="ghp_xxxx or github_pat_xxxx" autocomplete="off">
+                        </div>
+                    </div>
+
                     <div class="setting-item local-only" id="restart-service-setting">
                         <div class="setting-label">
                             <label data-i18n="settings.basic.restart-service.label">Restart Local Service</label>
@@ -431,6 +445,46 @@
             <div class="form-actions">
                 <button type="button" class="btn-cancel" id="access-token-modal-cancel" data-i18n="settings.btn.cancel">Cancel</button>
                 <button type="submit" class="btn-save" id="access-token-modal-save" data-i18n="settings.btn.save">Save</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Download Mirror Select Modal (shown when an update is available, before downloading) -->
+    <div class="modal" id="download-mirror-modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 class="modal-title" data-i18n="settings.update.mirror.modal.title">Select Download Source</h3>
+                <button class="modal-close" id="download-mirror-modal-close">&times;</button>
+            </div>
+            <div class="modal-body">
+                <p style="margin:0 0 12px;font-size:13px;color:#6b7280;" data-i18n="settings.update.mirror.modal.desc">Choose a download source for the update. Use a mirror if GitHub is slow or blocked in your region.</p>
+                <div id="download-mirror-options" style="display:flex;flex-direction:column;gap:8px;font-size:14px;">
+                    <label style="display:flex;align-items:center;gap:8px;cursor:pointer;">
+                        <input type="radio" name="download-mirror-radio" value="" checked>
+                        <span data-i18n="settings.update.mirror.direct">Direct (GitHub)</span>
+                    </label>
+                    <label style="display:flex;align-items:center;gap:8px;cursor:pointer;">
+                        <input type="radio" name="download-mirror-radio" value="https://gh-proxy.com">
+                        gh-proxy.com
+                    </label>
+                    <label style="display:flex;align-items:center;gap:8px;cursor:pointer;">
+                        <input type="radio" name="download-mirror-radio" value="https://github.akams.cn">
+                        github.akams.cn
+                    </label>
+                    <label style="display:flex;align-items:center;gap:8px;cursor:pointer;">
+                        <input type="radio" name="download-mirror-radio" value="https://ghproxy.homeboyc.cn">
+                        ghproxy.homeboyc.cn
+                    </label>
+                    <label style="display:flex;align-items:center;gap:8px;cursor:pointer;">
+                        <input type="radio" name="download-mirror-radio" value="__custom__">
+                        <span data-i18n="settings.update.mirror.custom">Custom...</span>
+                    </label>
+                    <input type="text" id="download-mirror-custom-input" class="form-input" data-i18n-placeholder="settings.update.mirror.custom-placeholder" placeholder="https://your-mirror.example.com" style="display:none;">
+                </div>
+            </div>
+            <div class="form-actions">
+                <button type="button" class="btn-cancel" id="download-mirror-modal-cancel" data-i18n="settings.btn.cancel">Cancel</button>
+                <button type="button" class="btn-save" id="download-mirror-modal-confirm" data-i18n="settings.update.mirror.modal.confirm">Download</button>
             </div>
         </div>
     </div>

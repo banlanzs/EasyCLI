@@ -139,6 +139,69 @@ struct OpResult {
     latestVersion: Option<String>,
 }
 
+/// EasyCLI 自身的应用设置（独立于 CLIProxyAPI 的 config.yaml），持久化在 app_dir/easycli-settings.json。
+/// 目前仅用于"检查更新"功能：GitHub 个人访问令牌 与 国内镜像源加速，二者均为可选开关。
+#[derive(Serialize, Deserialize, Debug, Clone, Default)]
+#[serde(rename_all = "camelCase")]
+struct EasyCliSettings {
+    /// 是否启用 GitHub 个人访问令牌进行认证（绕开匿名速率限制）
+    #[serde(default)]
+    use_github_token: bool,
+    /// GitHub 个人访问令牌（fine-grained / classic PAT）
+    #[serde(default, skip_serializing)]
+    github_token: String,
+}
+
+fn easycli_settings_path(dir: &Path) -> PathBuf {
+    dir.join("easycli-settings.json")
+}
+
+fn load_easycli_settings() -> EasyCliSettings {
+    let path = match app_dir() {
+        Ok(dir) => easycli_settings_path(&dir),
+        Err(_) => return EasyCliSettings::default(),
+    };
+    match fs::read_to_string(&path) {
+        Ok(content) => serde_json::from_str(&content).unwrap_or_default(),
+        Err(_) => EasyCliSettings::default(),
+    }
+}
+
+fn save_easycli_settings(settings: &EasyCliSettings) -> Result<(), AppError> {
+    let dir = app_dir()?;
+    fs::create_dir_all(&dir)?;
+    let path = easycli_settings_path(&dir);
+    let content = serde_json::to_string_pretty(settings)
+        .map_err(|e| AppError::Other(format!("Failed to serialize settings: {}", e)))?;
+    fs::write(&path, content)?;
+    Ok(())
+}
+
+/// 将原始 GitHub URL 改写为镜像前缀拼接形式。
+/// 镜像站普遍采用 `<mirror>/<原始完整URL>` 的代理模式，例如：
+///   https://gh-proxy.com/https://github.com/.../releases/download/v1.2.3/asset.zip
+/// mirror_url 为 None 或空字符串时原样返回（直连）。
+fn build_url_with_mirror(original_url: &str, mirror_url: Option<&str>) -> String {
+    match mirror_url.map(|s| s.trim()).filter(|s| !s.is_empty()) {
+        Some(mirror) => {
+            let m = mirror.trim_end_matches('/');
+            format!("{}/{}", m, original_url)
+        }
+        None => original_url.to_string(),
+    }
+}
+
+/// 构造 GitHub API 请求的 Authorization 头值（启用令牌时），否则返回 None。
+fn github_auth_header(settings: &EasyCliSettings) -> Option<String> {
+    if settings.use_github_token {
+        let token = settings.github_token.trim();
+        if !token.is_empty() {
+            return Some(format!("Bearer {}", token));
+        }
+    }
+    None
+}
+
 fn compare_versions(a: &str, b: &str) -> i32 {
     let pa: Vec<i32> = a.split('.').filter_map(|s| s.parse().ok()).collect();
     let pb: Vec<i32> = b.split('.').filter_map(|s| s.parse().ok()).collect();
@@ -311,6 +374,56 @@ mod tests {
         assert!(parse_proxy_url("http://proxy").is_err());
         assert!(parse_proxy_url("http://user@proxy:8080").is_err());
     }
+
+    #[test]
+    fn test_build_url_with_mirror() {
+        let original = "https://github.com/router-for-me/CLIProxyAPI/releases/download/v1.2.3/CLIProxyAPI_1.2.3_windows_amd64.zip";
+
+        // mirror_url 为 None → 原样返回（直连）
+        assert_eq!(build_url_with_mirror(original, None), original);
+
+        // mirror_url 为空字符串 → 原样返回（安全回退）
+        assert_eq!(build_url_with_mirror(original, Some("")), original);
+        assert_eq!(build_url_with_mirror(original, Some("   ")), original);
+
+        // 正常前缀 → 前缀拼接
+        assert_eq!(
+            build_url_with_mirror(original, Some("https://gh-proxy.com")),
+            "https://gh-proxy.com/https://github.com/router-for-me/CLIProxyAPI/releases/download/v1.2.3/CLIProxyAPI_1.2.3_windows_amd64.zip"
+        );
+
+        // 镜像 URL 末尾带斜杠应被规范化（避免出现双斜杠）
+        assert_eq!(
+            build_url_with_mirror(original, Some("https://gh-proxy.com/")),
+            "https://gh-proxy.com/https://github.com/router-for-me/CLIProxyAPI/releases/download/v1.2.3/CLIProxyAPI_1.2.3_windows_amd64.zip"
+        );
+
+        // 前后空白应被忽略
+        assert_eq!(
+            build_url_with_mirror(original, Some("  https://gh-proxy.com/  ")),
+            "https://gh-proxy.com/https://github.com/router-for-me/CLIProxyAPI/releases/download/v1.2.3/CLIProxyAPI_1.2.3_windows_amd64.zip"
+        );
+    }
+
+    #[test]
+    fn test_github_auth_header() {
+        // 默认（未启用）→ None
+        let settings = EasyCliSettings::default();
+        assert!(github_auth_header(&settings).is_none());
+
+        // 启用但 token 为空 → None（避免发送空 Authorization 头）
+        let mut settings = EasyCliSettings::default();
+        settings.use_github_token = true;
+        assert!(github_auth_header(&settings).is_none());
+
+        // 启用且有 token → Bearer <token>
+        settings.github_token = "ghp_abc123".to_string();
+        assert_eq!(github_auth_header(&settings).as_deref(), Some("Bearer ghp_abc123"));
+
+        // 启用但 token 仅含空白 → None
+        settings.github_token = "   ".to_string();
+        assert!(github_auth_header(&settings).is_none());
+    }
 }
 
 fn parse_proxy_url(proxy_url: &str) -> Result<ProxyConfig, String> {
@@ -376,6 +489,7 @@ fn parse_proxy_url(proxy_url: &str) -> Result<ProxyConfig, String> {
 }
 
 async fn fetch_latest_release(proxy_url: String) -> Result<VersionInfo, AppError> {
+    let settings = load_easycli_settings();
     let client_builder = reqwest::Client::builder()
         .user_agent("EasyCLI-Updater/1.0")
         .timeout(Duration::from_secs(30)) // Increased from 15s for slower connections
@@ -385,18 +499,23 @@ async fn fetch_latest_release(proxy_url: String) -> Result<VersionInfo, AppError
         .build()
         .map_err(|e| AppError::Other(format!("Failed to create HTTP client: {}", e)))?;
 
+    // 注意：镜像源不适用于 API 检查（多数镜像只代理文件下载，/releases/latest 会 404），
+    // 因此检查更新只走令牌认证 + 直连 API。镜像仅在下载 Release 资源时由前端选择传入。
+    let auth_header = github_auth_header(&settings);
+
     let mut last_err = None;
     for attempt in 0..3 {
         if attempt > 0 {
             println!("[FETCH] Retry attempt {}/3 after 2s delay", attempt + 1);
             sleep(Duration::from_secs(2)).await;
         }
-        match client
+        let mut req = client
             .get("https://api.github.com/repos/router-for-me/CLIProxyAPI/releases/latest")
-            .header("Accept", "application/vnd.github.v3+json")
-            .send()
-            .await
-        {
+            .header("Accept", "application/vnd.github.v3+json");
+        if let Some(ref auth) = auth_header {
+            req = req.header("Authorization", auth);
+        }
+        match req.send().await {
             Ok(resp) => match resp.error_for_status() {
                 Ok(r) => return Ok(r.json::<VersionInfo>().await?),
                 Err(e) => {
@@ -507,6 +626,7 @@ async fn check_version_and_download(
 async fn download_cliproxyapi(
     window: tauri::Window,
     proxy_url: Option<String>,
+    mirror_url: Option<String>,
 ) -> Result<serde_json::Value, String> {
     let proxy = proxy_url.unwrap_or_default();
     let dir = app_dir().map_err(|e| e.to_string())?;
@@ -551,11 +671,14 @@ async fn download_cliproxyapi(
         .build()
         .map_err(|e| format!("Failed to create HTTP client: {}", e))?;
 
-    println!("[DOWNLOAD] Starting download from: {}", asset.browser_download_url);
+    // 启用镜像源时（前端下载时选择），Release 资源下载 URL 走镜像前缀拼接
+    let download_url = build_url_with_mirror(&asset.browser_download_url, mirror_url.as_deref());
+
+    println!("[DOWNLOAD] Starting download from: {}", download_url);
     println!("[DOWNLOAD] Proxy: {}", if proxy.is_empty() { "none" } else { &proxy });
 
     let resp = client
-        .get(&asset.browser_download_url)
+        .get(&download_url)
         .send()
         .await
         .map_err(|e| {
@@ -565,7 +688,7 @@ async fn download_cliproxyapi(
                  Proxy: {}\n\
                  Please check your network connection and proxy settings.",
                 e,
-                asset.browser_download_url,
+                download_url,
                 if proxy.is_empty() { "none".to_string() } else { proxy.clone() }
             );
             println!("[DOWNLOAD ERROR] {}", error_msg);
@@ -1333,6 +1456,32 @@ fn read_runtime_health_summary() -> Result<serde_json::Value, String> {
     let dir = app_dir().map_err(|e| e.to_string())?;
     fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
     Ok(serde_json::to_value(load_runtime_health_summary(&dir)).map_err(|e| e.to_string())?)
+}
+
+#[tauri::command]
+fn read_update_settings() -> Result<serde_json::Value, String> {
+    let settings = load_easycli_settings();
+    // settings.github_token 标记了 skip_serializing，这里手动构造以回填前端输入框
+    Ok(json!({
+        "useGithubToken": settings.use_github_token,
+        "githubToken": settings.github_token
+    }))
+}
+
+#[tauri::command]
+fn write_update_settings(
+    use_github_token: Option<bool>,
+    github_token: Option<String>,
+) -> Result<serde_json::Value, String> {
+    let mut settings = load_easycli_settings();
+    if let Some(v) = use_github_token {
+        settings.use_github_token = v;
+    }
+    if let Some(v) = github_token {
+        settings.github_token = v.trim().to_string();
+    }
+    save_easycli_settings(&settings).map_err(|e| e.to_string())?;
+    Ok(json!({"success": true}))
 }
 
 #[tauri::command]
@@ -2336,6 +2485,8 @@ fn main() {
             start_cliproxyapi,
             open_runtime_log_directory,
             read_runtime_health_summary,
+            read_update_settings,
+            write_update_settings,
             export_runtime_logs_zip,
             open_settings_window,
             open_login_window,
