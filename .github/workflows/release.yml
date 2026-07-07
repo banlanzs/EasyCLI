@@ -7,7 +7,7 @@ on:
     workflow_dispatch:
         inputs:
             only:
-                description: "Run only one target (all/windows-x64/windows-arm64/linux-amd64/darwin-x64/darwin-arm64)"
+                description: "Run only one target (all/windows-x64/windows-arm64/linux-amd64)"
                 required: false
                 default: all
                 type: choice
@@ -16,8 +16,6 @@ on:
                     - windows-x64
                     - windows-arm64
                     - linux-amd64
-                    - darwin-x64
-                    - darwin-arm64
             tag:
                 description: "Release tag for manual run (e.g., v0.1.0-manual)"
                 required: false
@@ -72,17 +70,6 @@ jobs:
                       target: aarch64-pc-windows-msvc
                       artifact_suffix: windows-arm64
                       single_bundle: true
-                    # macOS
-                    - os: macos-15-intel
-                      os_name: darwin
-                      arch_label: x64
-                      target: x86_64-apple-darwin
-                      bundles: dmg
-                    - os: macos-14
-                      os_name: darwin
-                      arch_label: arm64
-                      target: aarch64-apple-darwin
-                      bundles: dmg
 
         steps:
             - name: Checkout
@@ -126,23 +113,11 @@ jobs:
               if: env.SELECTED == 'true'
               run: npm ci
 
-            - name: Install create-dmg (macOS)
-              if: env.SELECTED == 'true' && runner.os == 'macOS'
-              run: |
-                  brew update
-                  brew install create-dmg || true
-
             - name: Build with Tauri Action
               if: env.SELECTED == 'true'
               uses: tauri-apps/tauri-action@v0
               env:
                   GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-                  APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
-                  APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
-                  APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
-                  APPLE_ID: ${{ secrets.APPLE_ID }}
-                  APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
-                  APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
               with:
                   includeDebug: false
                   args: >
@@ -154,19 +129,6 @@ jobs:
               shell: bash
               run: |
                   mkdir -p release-out
-
-            - name: Collect and rename artifacts (macOS)
-              if: env.SELECTED == 'true' && runner.os == 'macOS'
-              shell: bash
-              run: |
-                  set -euo pipefail
-                  TAG=${{ env.RELEASE_TAG }}
-                  shopt -s nullglob
-                  for f in src-tauri/target/${{ matrix.target }}/release/bundle/dmg/*.dmg; do
-                    base="EasyCLI-${TAG}-${{ matrix.os_name }}-${{ matrix.arch_label }}.dmg"
-                    cp "$f" "release-out/$base"
-                    echo "Packaged $f -> release-out/$base"
-                  done
 
             - name: Collect and rename artifacts (Windows)
               if: env.SELECTED == 'true' && runner.os == 'Windows'
