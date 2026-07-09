@@ -547,15 +547,29 @@ async fn fetch_latest_release(proxy_url: String) -> Result<VersionInfo, AppError
     // 下载时由 download_cliproxyapi 使用 releases/latest/download/{asset} 魔法 URL。
     if settings.use_magic_url {
         println!("[FETCH] Using magic URL mode (HEAD redirect), skipping API");
-        let tag = try_fetch_latest_tag_via_redirect(&proxy_url).await?;
-        println!("[FETCH] Got latest tag via magic URL: {}", tag);
-        return Ok(VersionInfo {
-            tag_name: tag,
-            assets: vec![],
-        });
+        append_runtime_log("INFO", "[UPDATE] Mode: magic URL (HEAD redirect), skipping GitHub API");
+        match try_fetch_latest_tag_via_redirect(&proxy_url).await {
+            Ok(tag) => {
+                println!("[FETCH] Got latest tag via magic URL: {}", tag);
+                append_runtime_log("INFO", &format!("[UPDATE] Magic URL succeeded, latest tag: {}", tag));
+                return Ok(VersionInfo {
+                    tag_name: tag,
+                    assets: vec![],
+                });
+            }
+            Err(e) => {
+                append_runtime_log("ERROR", &format!("[UPDATE] Magic URL failed: {}", e));
+                return Err(e);
+            }
+        }
     }
 
     // 标准模式：通过 GitHub API 获取版本信息（可选 PAT 认证）
+    let has_pat = settings.use_github_token && !settings.github_token.trim().is_empty();
+    append_runtime_log("INFO", &format!(
+        "[UPDATE] Mode: GitHub API{}",
+        if has_pat { " (with PAT)" } else { " (anonymous)" }
+    ));
     let client_builder = reqwest::Client::builder()
         .user_agent("EasyCLI-Updater/1.0")
         .timeout(Duration::from_secs(30))
@@ -581,7 +595,13 @@ async fn fetch_latest_release(proxy_url: String) -> Result<VersionInfo, AppError
         }
         match req.send().await {
             Ok(resp) => match resp.error_for_status() {
-                Ok(r) => return Ok(r.json::<VersionInfo>().await?),
+                Ok(r) => {
+                    let info = r.json::<VersionInfo>().await?;
+                    append_runtime_log("INFO", &format!(
+                        "[UPDATE] API succeeded, latest tag: {}", info.tag_name
+                    ));
+                    return Ok(info);
+                }
                 Err(e) => {
                     last_err = Some(AppError::Http(e));
                     println!("[FETCH] HTTP error: {:?}", last_err);
@@ -597,9 +617,11 @@ async fn fetch_latest_release(proxy_url: String) -> Result<VersionInfo, AppError
     // API 失败（如 rate limit 403），兜底用 HEAD releases/latest 的 302 重定向获取最新 tag。
     // github.com 的 web 请求不受 API rate limit 限制，且不需要认证。
     println!("[FETCH] API failed ({:?}), trying redirect fallback", last_err);
+    append_runtime_log("WARN", &format!("[UPDATE] API failed, trying redirect fallback: {:?}", last_err));
     match try_fetch_latest_tag_via_redirect(&proxy_url).await {
         Ok(tag) => {
             println!("[FETCH] Got latest tag via redirect fallback: {}", tag);
+            append_runtime_log("INFO", &format!("[UPDATE] Redirect fallback succeeded, latest tag: {}", tag));
             return Ok(VersionInfo {
                 tag_name: tag,
                 assets: vec![],
@@ -607,6 +629,7 @@ async fn fetch_latest_release(proxy_url: String) -> Result<VersionInfo, AppError
         }
         Err(e) => {
             println!("[FETCH] Redirect fallback also failed: {:?}", e);
+            append_runtime_log("ERROR", &format!("[UPDATE] All methods failed (API: {:?}, redirect: {})", last_err, e));
         }
     }
 
@@ -659,6 +682,7 @@ async fn check_version_and_download(
         let cmp = compare_versions(&ver, &latest);
         ensure_config(&path).map_err(|e| e.to_string())?;
         if cmp >= 0 {
+            append_runtime_log("INFO", &format!("[UPDATE] Already up to date: v{}", ver));
             window
                 .emit(
                     "download-status",
@@ -675,6 +699,7 @@ async fn check_version_and_download(
                 latestVersion: None
             }));
         } else {
+            append_runtime_log("INFO", &format!("[UPDATE] Update available: v{} → v{}", ver, latest));
             window
                 .emit(
                     "download-status",
@@ -693,6 +718,7 @@ async fn check_version_and_download(
         }
     }
     // No local found
+    append_runtime_log("INFO", &format!("[UPDATE] CLIProxyAPI not installed, latest available: v{}", latest));
     Ok(json!(OpResult {
         success: true,
         error: None,
@@ -717,6 +743,12 @@ async fn download_cliproxyapi(
         .await
         .map_err(|e| e.to_string())?;
     let latest = release.tag_name.trim_start_matches('v').to_string();
+    append_runtime_log("INFO", &format!(
+        "[UPDATE] Downloading v{} ({}), mirror: {}",
+        latest,
+        if release.assets.is_empty() { "magic URL mode" } else { "API mode" },
+        if mirror_url.as_deref().unwrap_or("").is_empty() { "none" } else { mirror_url.as_deref().unwrap_or("") }
+    ));
 
     let platform = std::env::consts::OS;
     let arch = std::env::consts::ARCH;
@@ -785,9 +817,11 @@ async fn download_cliproxyapi(
                 if proxy.is_empty() { "none".to_string() } else { proxy.clone() }
             );
             println!("[DOWNLOAD ERROR] {}", error_msg);
+            append_runtime_log("ERROR", &format!("[UPDATE] Download connection failed: {}", e));
             error_msg
         })?;
     if !resp.status().is_success() {
+        append_runtime_log("ERROR", &format!("[UPDATE] Download HTTP error: {}", resp.status()));
         return Err(format!("Download failed, status: {}", resp.status()));
     }
     let total = resp.content_length().unwrap_or(0);
@@ -848,6 +882,7 @@ async fn download_cliproxyapi(
     // Ensure config exists
     ensure_config(&extract_path).map_err(|e| e.to_string())?;
 
+    append_runtime_log("INFO", &format!("[UPDATE] Download completed, version: {}", latest));
     window
         .emit(
             "download-status",
