@@ -488,11 +488,58 @@ fn parse_proxy_url(proxy_url: &str) -> Result<ProxyConfig, String> {
     }
 }
 
+/// 通过 HEAD 请求 github.com/{owner}/{repo}/releases/latest 获取最新 tag。
+/// 该 URL 返回 302 重定向到 .../releases/tag/{tag}，不受 API rate limit 限制，
+/// 也不需要认证，作为 API 请求失败时的兜底方案。
+async fn try_fetch_latest_tag_via_redirect(proxy_url: &str) -> Result<String, AppError> {
+    let client_builder = reqwest::Client::builder()
+        .user_agent("EasyCLI-Updater/1.0")
+        .timeout(Duration::from_secs(15))
+        .redirect(reqwest::redirect::Policy::none()); // 不跟随重定向，手动读 Location 头
+
+    let client = parse_proxy(proxy_url, client_builder)
+        .build()
+        .map_err(|e| AppError::Other(format!("Failed to create HTTP client: {}", e)))?;
+
+    let resp = client
+        .head("https://github.com/router-for-me/CLIProxyAPI/releases/latest")
+        .send()
+        .await?;
+
+    let status = resp.status();
+    if status != reqwest::StatusCode::FOUND {
+        return Err(AppError::Other(format!(
+            "Expected 302 redirect from releases/latest, got {}",
+            status
+        )));
+    }
+
+    let location = resp
+        .headers()
+        .get("location")
+        .and_then(|v| v.to_str().ok())
+        .ok_or_else(|| AppError::Other("Missing Location header in redirect".into()))?;
+
+    // 从 https://github.com/.../releases/tag/v1.2.3 提取 v1.2.3
+    let tag = location
+        .rsplit('/')
+        .next()
+        .filter(|s| !s.is_empty())
+        .ok_or_else(|| {
+            AppError::Other(format!(
+                "Cannot parse tag from redirect URL: {}",
+                location
+            ))
+        })?;
+
+    Ok(tag.to_string())
+}
+
 async fn fetch_latest_release(proxy_url: String) -> Result<VersionInfo, AppError> {
     let settings = load_easycli_settings();
     let client_builder = reqwest::Client::builder()
         .user_agent("EasyCLI-Updater/1.0")
-        .timeout(Duration::from_secs(30)) // Increased from 15s for slower connections
+        .timeout(Duration::from_secs(30))
         .connect_timeout(Duration::from_secs(15));
 
     let client = parse_proxy(&proxy_url, client_builder)
@@ -503,6 +550,7 @@ async fn fetch_latest_release(proxy_url: String) -> Result<VersionInfo, AppError
     // 因此检查更新只走令牌认证 + 直连 API。镜像仅在下载 Release 资源时由前端选择传入。
     let auth_header = github_auth_header(&settings);
 
+    // 优先尝试 GitHub API（带令牌认证，有重试机制）
     let mut last_err = None;
     for attempt in 0..3 {
         if attempt > 0 {
@@ -529,18 +577,36 @@ async fn fetch_latest_release(proxy_url: String) -> Result<VersionInfo, AppError
             }
         }
     }
+
+    // API 失败（如 rate limit 403），兜底用 HEAD releases/latest 的 302 重定向获取最新 tag。
+    // github.com 的 web 请求不受 API rate limit 限制，且不需要认证。
+    println!("[FETCH] API failed ({:?}), trying redirect fallback", last_err);
+    match try_fetch_latest_tag_via_redirect(&proxy_url).await {
+        Ok(tag) => {
+            println!("[FETCH] Got latest tag via redirect fallback: {}", tag);
+            return Ok(VersionInfo {
+                tag_name: tag,
+                assets: vec![],
+            });
+        }
+        Err(e) => {
+            println!("[FETCH] Redirect fallback also failed: {:?}", e);
+        }
+    }
+
+    // 两种方式都失败，返回 API 的错误（更有诊断价值）
     let err_msg = if !proxy_url.is_empty() {
         format!(
-            "Failed to fetch latest release info after 3 attempts.\n\
+            "Failed to fetch latest release info.\n\
              Proxy: {}\n\
-             Error: {:?}\n\
+             API error: {:?}\n\
              Please check your proxy settings and try again.",
             proxy_url, last_err
         )
     } else {
         format!(
-            "Failed to fetch latest release info after 3 attempts.\n\
-             Error: {:?}\n\
+            "Failed to fetch latest release info.\n\
+             API error: {:?}\n\
              Please check your network connection and try again.",
             last_err
         )
@@ -647,11 +713,22 @@ async fn download_cliproxyapi(
         ("windows", "aarch64") => format!("CLIProxyAPI_{}_windows_arm64.zip", latest),
         _ => return Err(format!("Unsupported platform: {} {}", platform, arch)),
     };
-    let asset = release
-        .assets
-        .into_iter()
-        .find(|a| a.name == filename)
-        .ok_or_else(|| format!("No suitable download file found: {}", filename))?;
+    // assets 为空说明是通过 redirect 兜底获取的版本（API 不可用），
+    // 使用 releases/latest/download/{asset} 魔法 URL 直接下载，
+    // GitHub 会自动解析到最新 release 的对应 asset，跳过 API 调用。
+    let asset_url = if release.assets.is_empty() {
+        format!(
+            "https://github.com/router-for-me/CLIProxyAPI/releases/latest/download/{}",
+            filename
+        )
+    } else {
+        release
+            .assets
+            .into_iter()
+            .find(|a| a.name == filename)
+            .ok_or_else(|| format!("No suitable download file found: {}", filename))?
+            .browser_download_url
+    };
 
     let download_path = dir.join(&filename);
     window
@@ -672,7 +749,7 @@ async fn download_cliproxyapi(
         .map_err(|e| format!("Failed to create HTTP client: {}", e))?;
 
     // 启用镜像源时（前端下载时选择），Release 资源下载 URL 走镜像前缀拼接
-    let download_url = build_url_with_mirror(&asset.browser_download_url, mirror_url.as_deref());
+    let download_url = build_url_with_mirror(&asset_url, mirror_url.as_deref());
 
     println!("[DOWNLOAD] Starting download from: {}", download_url);
     println!("[DOWNLOAD] Proxy: {}", if proxy.is_empty() { "none" } else { &proxy });
