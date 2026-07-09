@@ -122,6 +122,19 @@
                         </div>
                     </div>
 
+                    <div class="setting-item local-only" id="magic-url-setting">
+                        <div class="setting-label">
+                            <label for="magic-url-switch" data-i18n="settings.update.magic-url.label">Use Magic URL for Update Check</label>
+                            <span class="setting-description" data-i18n="settings.update.magic-url.desc">Skip GitHub API entirely, use HEAD redirect on github.com/releases/latest to get the latest version — bypasses API rate limits without a PAT</span>
+                        </div>
+                        <div class="setting-control">
+                            <label class="switch">
+                                <input type="checkbox" id="magic-url-switch" class="switch-input">
+                                <span class="switch-slider"></span>
+                            </label>
+                        </div>
+                    </div>
+
                     <div class="setting-item local-only" id="restart-service-setting">
                         <div class="setting-label">
                             <label data-i18n="settings.basic.restart-service.label">Restart Local Service</label>

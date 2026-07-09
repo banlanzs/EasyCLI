@@ -140,7 +140,7 @@ struct OpResult {
 }
 
 /// EasyCLI 自身的应用设置（独立于 CLIProxyAPI 的 config.yaml），持久化在 app_dir/easycli-settings.json。
-/// 目前仅用于"检查更新"功能：GitHub 个人访问令牌 与 国内镜像源加速，二者均为可选开关。
+/// 用于"检查更新"功能：GitHub 个人访问令牌 与 魔法 URL（HEAD 重定向），二者均为可选开关。
 #[derive(Serialize, Deserialize, Debug, Clone, Default)]
 #[serde(rename_all = "camelCase")]
 struct EasyCliSettings {
@@ -150,6 +150,10 @@ struct EasyCliSettings {
     /// GitHub 个人访问令牌（fine-grained / classic PAT）
     #[serde(default, skip_serializing)]
     github_token: String,
+    /// 是否使用魔法 URL（HEAD releases/latest 的 302 重定向）获取最新版本，
+    /// 跳过 api.github.com 请求，完全规避 API rate limit。
+    #[serde(default)]
+    use_magic_url: bool,
 }
 
 fn easycli_settings_path(dir: &Path) -> PathBuf {
@@ -537,6 +541,21 @@ async fn try_fetch_latest_tag_via_redirect(proxy_url: &str) -> Result<String, Ap
 
 async fn fetch_latest_release(proxy_url: String) -> Result<VersionInfo, AppError> {
     let settings = load_easycli_settings();
+
+    // 魔法 URL 模式：直接用 HEAD releases/latest 的 302 重定向获取最新 tag，
+    // 完全跳过 api.github.com，规避 API rate limit。此模式下 assets 为空，
+    // 下载时由 download_cliproxyapi 使用 releases/latest/download/{asset} 魔法 URL。
+    if settings.use_magic_url {
+        println!("[FETCH] Using magic URL mode (HEAD redirect), skipping API");
+        let tag = try_fetch_latest_tag_via_redirect(&proxy_url).await?;
+        println!("[FETCH] Got latest tag via magic URL: {}", tag);
+        return Ok(VersionInfo {
+            tag_name: tag,
+            assets: vec![],
+        });
+    }
+
+    // 标准模式：通过 GitHub API 获取版本信息（可选 PAT 认证）
     let client_builder = reqwest::Client::builder()
         .user_agent("EasyCLI-Updater/1.0")
         .timeout(Duration::from_secs(30))
@@ -546,11 +565,8 @@ async fn fetch_latest_release(proxy_url: String) -> Result<VersionInfo, AppError
         .build()
         .map_err(|e| AppError::Other(format!("Failed to create HTTP client: {}", e)))?;
 
-    // 注意：镜像源不适用于 API 检查（多数镜像只代理文件下载，/releases/latest 会 404），
-    // 因此检查更新只走令牌认证 + 直连 API。镜像仅在下载 Release 资源时由前端选择传入。
     let auth_header = github_auth_header(&settings);
 
-    // 优先尝试 GitHub API（带令牌认证，有重试机制）
     let mut last_err = None;
     for attempt in 0..3 {
         if attempt > 0 {
@@ -1541,7 +1557,8 @@ fn read_update_settings() -> Result<serde_json::Value, String> {
     // settings.github_token 标记了 skip_serializing，这里手动构造以回填前端输入框
     Ok(json!({
         "useGithubToken": settings.use_github_token,
-        "githubToken": settings.github_token
+        "githubToken": settings.github_token,
+        "useMagicUrl": settings.use_magic_url
     }))
 }
 
@@ -1549,6 +1566,7 @@ fn read_update_settings() -> Result<serde_json::Value, String> {
 fn write_update_settings(
     use_github_token: Option<bool>,
     github_token: Option<String>,
+    use_magic_url: Option<bool>,
 ) -> Result<serde_json::Value, String> {
     let mut settings = load_easycli_settings();
     if let Some(v) = use_github_token {
@@ -1556,6 +1574,9 @@ fn write_update_settings(
     }
     if let Some(v) = github_token {
         settings.github_token = v.trim().to_string();
+    }
+    if let Some(v) = use_magic_url {
+        settings.use_magic_url = v;
     }
     save_easycli_settings(&settings).map_err(|e| e.to_string())?;
     Ok(json!({"success": true}))

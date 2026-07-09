@@ -13,6 +13,9 @@ const updateProgressFill = document.getElementById('update-progress-fill');
 const githubTokenSwitch = document.getElementById('github-token-switch');
 const githubTokenInput = document.getElementById('github-token-input');
 
+// Magic URL switch — skip GitHub API entirely, use HEAD redirect on github.com/releases/latest
+const magicUrlSwitch = document.getElementById('magic-url-switch');
+
 // Download mirror selection modal — shown after an update is found, before downloading.
 // Mirror is a per-download choice (most mirrors only proxy file downloads, not the API),
 // so it is NOT applied to update checks. Last selection is remembered in localStorage.
@@ -30,7 +33,8 @@ async function saveUpdateSettings() {
     try {
         await window.__TAURI__.core.invoke('write_update_settings', {
             useGithubToken: githubTokenSwitch.checked,
-            githubToken: githubTokenInput.value
+            githubToken: githubTokenInput.value,
+            useMagicUrl: magicUrlSwitch.checked
         });
     } catch (err) {
         console.error('Failed to save update settings:', err);
@@ -44,6 +48,7 @@ async function loadUpdateSettings() {
         const s = await window.__TAURI__.core.invoke('read_update_settings');
         githubTokenSwitch.checked = !!s.useGithubToken;
         githubTokenInput.value = s.githubToken || '';
+        magicUrlSwitch.checked = !!s.useMagicUrl;
     } catch (err) {
         console.error('Failed to load update settings:', err);
     }
@@ -286,8 +291,9 @@ checkUpdateBtn.addEventListener('click', async () => {
 // Initialize on load
 initializeAutoUpdateSwitch();
 
-// Wire up GitHub PAT setting — save on change
+// Wire up GitHub PAT & magic URL settings — save on change
 githubTokenSwitch.addEventListener('change', saveUpdateSettings);
 githubTokenInput.addEventListener('change', saveUpdateSettings);
+magicUrlSwitch.addEventListener('change', saveUpdateSettings);
 
 loadUpdateSettings();
