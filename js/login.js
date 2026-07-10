@@ -446,6 +446,11 @@ async function handleConnectClick() {
 
                 const result = await window.__TAURI__.core.invoke('check_version_and_download', { proxyUrl });
 
+                if (result.skipped) {
+                    // 另一个 webview 实例正在处理，静默返回
+                    return;
+                }
+
                 if (result.success) {
                     if (result.needsUpdate) {
                         // Update needed, show update dialog

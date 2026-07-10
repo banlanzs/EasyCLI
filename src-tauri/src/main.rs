@@ -673,7 +673,7 @@ async fn check_version_and_download(
         .compare_exchange(false, true, Ordering::SeqCst, Ordering::SeqCst)
         .is_err()
     {
-        return Ok(json!({"success": true}));
+        return Ok(json!({"success": true, "skipped": true}));
     }
     let _update_guard = AtomicBoolGuard(&UPDATE_CHECK_IN_PROGRESS);
 
