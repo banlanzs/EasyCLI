@@ -185,8 +185,9 @@ updateConfirmBtn.addEventListener('click', async () => {
                     passwordDialog.classList.add('show');
                 } else {
                     // Password is set: start process then go to settings
+                    let startRes = null;
                     try {
-                        const startRes = await window.__TAURI__.core.invoke('start_cliproxyapi');
+                        startRes = await window.__TAURI__.core.invoke('start_cliproxyapi');
                         if (!startRes || !startRes.success) {
                             showError('CLIProxyAPI process start failed');
                             return;
