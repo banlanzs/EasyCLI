@@ -44,7 +44,17 @@ static KEEP_ALIVE_HANDLE: Lazy<Arc<Mutex<Option<(Arc<AtomicBool>, thread::JoinHa
 static CLI_PROXY_PASSWORD: Lazy<Arc<Mutex<Option<String>>>> =
     Lazy::new(|| Arc::new(Mutex::new(None)));
 static KEEP_ALIVE_RESTARTING: AtomicBool = AtomicBool::new(false);
+static UPDATE_CHECK_IN_PROGRESS: AtomicBool = AtomicBool::new(false);
 const RUNTIME_LOG_RETENTION_DAYS: usize = 14;
+
+/// Guard that resets an AtomicBool when dropped, ensuring the flag
+/// is cleared on all exit paths (success, error, early return).
+struct AtomicBoolGuard(&'static AtomicBool);
+impl Drop for AtomicBoolGuard {
+    fn drop(&mut self) {
+        self.0.store(false, Ordering::SeqCst);
+    }
+}
 
 #[derive(Error, Debug)]
 enum AppError {
@@ -658,6 +668,15 @@ async fn check_version_and_download(
     window: tauri::Window,
     proxy_url: Option<String>,
 ) -> Result<serde_json::Value, String> {
+    // 防止多个 webview 实例并发调用（Tauri 多窗口场景下 login + settings 可能同时触发）
+    if UPDATE_CHECK_IN_PROGRESS
+        .compare_exchange(false, true, Ordering::SeqCst, Ordering::SeqCst)
+        .is_err()
+    {
+        return Ok(json!({"success": true}));
+    }
+    let _update_guard = AtomicBoolGuard(&UPDATE_CHECK_IN_PROGRESS);
+
     let proxy = proxy_url.unwrap_or_default();
     let dir = app_dir().map_err(|e| e.to_string())?;
     fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
@@ -736,6 +755,16 @@ async fn download_cliproxyapi(
     proxy_url: Option<String>,
     mirror_url: Option<String>,
 ) -> Result<serde_json::Value, String> {
+    // 防止并发下载（多个 webview 实例同时触发）
+    static DOWNLOAD_IN_PROGRESS: AtomicBool = AtomicBool::new(false);
+    if DOWNLOAD_IN_PROGRESS
+        .compare_exchange(false, true, Ordering::SeqCst, Ordering::SeqCst)
+        .is_err()
+    {
+        return Err("Download already in progress".into());
+    }
+    let _download_guard = AtomicBoolGuard(&DOWNLOAD_IN_PROGRESS);
+
     let proxy = proxy_url.unwrap_or_default();
     let dir = app_dir().map_err(|e| e.to_string())?;
     fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
