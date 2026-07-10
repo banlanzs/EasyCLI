@@ -296,9 +296,19 @@ checkUpdateBtn.addEventListener('click', async () => {
 // Initialize on load
 initializeAutoUpdateSwitch();
 
-// Wire up GitHub PAT & magic URL settings — save on change
-githubTokenSwitch.addEventListener('change', saveUpdateSettings);
+// Wire up GitHub PAT & magic URL settings — mutually exclusive, save on change
+githubTokenSwitch.addEventListener('change', () => {
+    if (githubTokenSwitch.checked && magicUrlSwitch.checked) {
+        magicUrlSwitch.checked = false;
+    }
+    saveUpdateSettings();
+});
 githubTokenInput.addEventListener('change', saveUpdateSettings);
-magicUrlSwitch.addEventListener('change', saveUpdateSettings);
+magicUrlSwitch.addEventListener('change', () => {
+    if (magicUrlSwitch.checked && githubTokenSwitch.checked) {
+        githubTokenSwitch.checked = false;
+    }
+    saveUpdateSettings();
+});
 
 loadUpdateSettings();
