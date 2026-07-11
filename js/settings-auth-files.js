@@ -335,8 +335,15 @@ function uploadLocalFile() {
 async function uploadFilesToServer(files) {
     try {
         const result = await configManager.uploadAuthFiles(files);
-        if (result.success && result.successCount > 0) {
-            showSuccessMessage(`Uploaded ${result.successCount} file(s) successfully`);
+        const parts = [];
+        if (result.successCount > 0) {
+            parts.push(i18n.t('msg.upload-success').replace('{count}', result.successCount));
+        }
+        if (result.skippedCount > 0) {
+            parts.push(i18n.t('msg.upload-skipped').replace('{count}', result.skippedCount));
+        }
+        if (parts.length > 0) {
+            showSuccessMessage(parts.join('; '));
         }
         if (result.errorCount > 0) {
             const errorMessage = result.errors && result.errors.length <= 3

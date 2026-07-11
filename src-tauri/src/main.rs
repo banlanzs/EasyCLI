@@ -1167,13 +1167,13 @@ fn upload_local_auth_files(files: Vec<UploadFile>) -> Result<serde_json::Value, 
     let ad = resolve_path(auth_dir, Some(base));
     fs::create_dir_all(&ad).map_err(|e| e.to_string())?;
     let mut success = 0usize;
+    let mut skipped = 0usize;
     let mut errors = vec![];
     let mut error_count = 0usize;
     for f in files {
         let path = ad.join(&f.name);
         if path.exists() {
-            errors.push(format!("{}: File already exists", f.name));
-            error_count += 1;
+            skipped += 1;
             continue;
         }
         if let Err(e) = fs::write(&path, f.content.as_bytes()) {
@@ -1184,7 +1184,7 @@ fn upload_local_auth_files(files: Vec<UploadFile>) -> Result<serde_json::Value, 
         }
     }
     Ok(
-        json!({"success": success>0, "successCount": success, "errorCount": error_count, "errors": if errors.is_empty(){serde_json::Value::Null}else{json!(errors)} }),
+        json!({"success": success>0, "successCount": success, "skippedCount": skipped, "errorCount": error_count, "errors": if errors.is_empty(){serde_json::Value::Null}else{json!(errors)} }),
     )
 }
 
